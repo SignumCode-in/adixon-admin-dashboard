@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { clinicAPI } from '../services/api';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { Hospital, PlusCircle, Search, Edit2, ArrowLeft, Trash2 } from 'lucide-react';
+import { Hospital, PlusCircle, Search, Edit2, ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
 
 export default function Clinics() {
+  const navigate = useNavigate();
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -377,9 +379,14 @@ export default function Clinics() {
               {filtered.map((c) => (
                 <tr key={c._id}>
                   <td style={{ fontWeight: 'bold' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Hospital size={16} color="var(--color-primary)" />
-                      {c.name}
+                    <span 
+                      onClick={() => navigate(`/clinics/${c._id}`)} 
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--color-primary)' }}
+                      title="Open Clinic Scope & Dedicated Sub-Sidebar"
+                    >
+                      <Hospital size={16} />
+                      <span>{c.name}</span>
+                      <ExternalLink size={12} style={{ opacity: 0.7 }} />
                     </span>
                   </td>
                   <td>{c.phone || 'N/A'}</td>
@@ -388,7 +395,10 @@ export default function Clinics() {
                   <td>{c.open_days || 'Mon - Sat'}</td>
                   <td>{c.visit_hours || 'N/A'}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '11px' }} onClick={() => navigate(`/clinics/${c._id}`)}>
+                        Open Scope
+                      </button>
                       <button className="icon-btn" onClick={() => handleOpenEdit(c)} title="Edit clinic info">
                         <Edit2 size={14} />
                       </button>

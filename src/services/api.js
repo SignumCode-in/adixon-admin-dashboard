@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.0.101:3000/api/v1';
+const API_BASE_URL = 'http://192.168.0.100:3000/api/v1';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -28,11 +28,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Unauthorized, clear tokens
-      localStorage.removeItem('id_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+      // Clear token if unauthenticated
+      const isAuthRoute = error.config.url.includes('/auth/login') || error.config.url.includes('/auth/generate-token');
+      if (!isAuthRoute) {
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('user');
         window.location.href = '/login';
       }
     }
@@ -41,12 +41,10 @@ apiClient.interceptors.response.use(
 );
 
 export const authAPI = {
-  // Simulates Firebase Sign In to get ID Token & Refresh Token
   generateToken: async (email, password) => {
     const response = await apiClient.post('/auth/generate-token', { email, password });
     return response.data;
   },
-  // Submits Firebase ID Token to backend to load user metadata
   login: async (token) => {
     const response = await apiClient.post('/auth/login', { token });
     return response.data;
@@ -55,16 +53,8 @@ export const authAPI = {
     const response = await apiClient.post('/auth/logout');
     return response.data;
   },
-  forgotPassword: async (email) => {
-    const response = await apiClient.post('/auth/forgot-password', { email });
-    return response.data;
-  },
-  verifyOtp: async (email, otp) => {
-    const response = await apiClient.post('/auth/verify-otp', { email, otp });
-    return response.data;
-  },
-  resetPassword: async (email, otp, new_password) => {
-    const response = await apiClient.post('/auth/reset-password', { email, otp, new_password });
+  refreshToken: async (refresh_token) => {
+    const response = await apiClient.post('/auth/refresh-token', { refresh_token });
     return response.data;
   },
 };
@@ -97,8 +87,8 @@ export const userAPI = {
 };
 
 export const clinicAPI = {
-  getClinics: async () => {
-    const response = await apiClient.get('/clinics');
+  getClinics: async (params = {}) => {
+    const response = await apiClient.get('/clinics', { params });
     return response.data;
   },
   getClinicById: async (id) => {
@@ -116,8 +106,12 @@ export const clinicAPI = {
 };
 
 export const patientAPI = {
-  getPatients: async () => {
-    const response = await apiClient.get('/patients');
+  getPatients: async (params = {}) => {
+    const response = await apiClient.get('/patients', { params });
+    return response.data;
+  },
+  getPatientById: async (id) => {
+    const response = await apiClient.get(`/patients/${id}`);
     return response.data;
   },
   createPatient: async (patientData) => {
@@ -135,8 +129,8 @@ export const patientAPI = {
 };
 
 export const appointmentAPI = {
-  getAppointments: async () => {
-    const response = await apiClient.get('/appointments');
+  getAppointments: async (params = {}) => {
+    const response = await apiClient.get('/appointments', { params });
     return response.data;
   },
   createAppointment: async (appointmentData) => {
@@ -150,8 +144,8 @@ export const appointmentAPI = {
 };
 
 export const prescriptionAPI = {
-  getPrescriptions: async () => {
-    const response = await apiClient.get('/prescriptions');
+  getPrescriptions: async (params = {}) => {
+    const response = await apiClient.get('/prescriptions', { params });
     return response.data;
   },
   createPrescription: async (prescriptionData) => {
@@ -161,8 +155,8 @@ export const prescriptionAPI = {
 };
 
 export const medicineAPI = {
-  getMedicines: async () => {
-    const response = await apiClient.get('/medicines');
+  getMedicines: async (params = {}) => {
+    const response = await apiClient.get('/medicines', { params });
     return response.data;
   },
   createMedicine: async (data) => {
@@ -180,8 +174,8 @@ export const medicineAPI = {
 };
 
 export const labAPI = {
-  getLabs: async () => {
-    const response = await apiClient.get('/labs');
+  getLabs: async (params = {}) => {
+    const response = await apiClient.get('/labs', { params });
     return response.data;
   },
   createLab: async (data) => {
@@ -199,8 +193,8 @@ export const labAPI = {
 };
 
 export const certificateAPI = {
-  getCertificates: async () => {
-    const response = await apiClient.get('/certificates');
+  getCertificates: async (params = {}) => {
+    const response = await apiClient.get('/certificates', { params });
     return response.data;
   },
   createCertificate: async (data) => {
@@ -214,8 +208,8 @@ export const certificateAPI = {
 };
 
 export const instructionAPI = {
-  getInstructions: async () => {
-    const response = await apiClient.get('/instructions');
+  getInstructions: async (params = {}) => {
+    const response = await apiClient.get('/instructions', { params });
     return response.data;
   },
   createInstruction: async (data) => {
@@ -233,8 +227,8 @@ export const instructionAPI = {
 };
 
 export const consentAPI = {
-  getConsents: async () => {
-    const response = await apiClient.get('/consents');
+  getConsents: async (params = {}) => {
+    const response = await apiClient.get('/consents', { params });
     return response.data;
   },
   createConsent: async (data) => {
@@ -248,8 +242,8 @@ export const consentAPI = {
 };
 
 export const templateAPI = {
-  getTemplates: async () => {
-    const response = await apiClient.get('/templates');
+  getTemplates: async (params = {}) => {
+    const response = await apiClient.get('/templates', { params });
     return response.data;
   },
   createTemplate: async (data) => {

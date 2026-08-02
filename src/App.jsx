@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ClinicProvider } from './context/ClinicContext';
 import PermissionGuard from './components/PermissionGuard';
 import Layout from './components/Layout';
@@ -12,7 +12,9 @@ import Settings from './pages/Settings';
 
 // Core Medical CRUD Pages
 import Clinics from './pages/Clinics';
+import ClinicOverview from './pages/ClinicOverview';
 import Patients from './pages/Patients';
+import PatientDetails from './pages/PatientDetails';
 import Appointments from './pages/Appointments';
 import Prescriptions from './pages/Prescriptions';
 import Medicines from './pages/Medicines';
@@ -31,6 +33,14 @@ import AuditLogs from './pages/AuditLogs';
 
 import './App.css';
 
+function RootRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'admin') {
+    return <Navigate to="/analytics" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -42,20 +52,14 @@ export default function App() {
 
             {/* Protected 3-Tier Dashboard Layout */}
             <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route
-                path="/analytics"
-                element={
-                  <PermissionGuard requiredPermission="stats">
-                    <Analytics />
-                  </PermissionGuard>
-                }
-              />
+              <Route path="/" element={<RootRedirect />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
               
               {/* User & Staff Management (Admin or Doctor) */}
               <Route path="/users" element={<Users />} />
               
-              {/* Master Admin Only Routes */}
+              {/* Master Admin Top-Level Governance Routes */}
               <Route
                 path="/clinics"
                 element={
@@ -64,6 +68,21 @@ export default function App() {
                   </PermissionGuard>
                 }
               />
+
+              {/* NESTED CLINIC DEDICATED SCOPE ROUTES */}
+              <Route path="/clinics/:clinicId" element={<ClinicOverview />} />
+              <Route path="/clinics/:clinicId/patients" element={<Patients />} />
+              <Route path="/clinics/:clinicId/appointments" element={<Appointments />} />
+              <Route path="/clinics/:clinicId/prescriptions" element={<Prescriptions />} />
+              <Route path="/clinics/:clinicId/certificates" element={<Certificates />} />
+              <Route path="/clinics/:clinicId/instructions" element={<Instructions />} />
+              <Route path="/clinics/:clinicId/consents" element={<Consents />} />
+              <Route path="/clinics/:clinicId/templates" element={<Templates />} />
+              <Route path="/clinics/:clinicId/settings" element={<Settings />} />
+
+              {/* PATIENT DETAILS TABBED INSPECTOR ROUTE */}
+              <Route path="/patients/:patientId" element={<PatientDetails />} />
+
               <Route
                 path="/security"
                 element={
@@ -89,7 +108,7 @@ export default function App() {
                 }
               />
 
-              {/* Core Medical CRUD (Permission guarded for Staff) */}
+              {/* Core Medical CRUD (Permission guarded for Staff/Doctors) */}
               <Route
                 path="/patients"
                 element={

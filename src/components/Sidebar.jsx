@@ -1,7 +1,6 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   BarChart3, 
   Users, 
   Hospital,
@@ -20,76 +19,165 @@ import {
   ChevronRight,
   ShieldCheck,
   Lock,
-  ListOrdered
+  ArrowLeft,
+  Building
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { clinicAPI } from '../services/api';
 
 export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile }) {
   const { user, logout, isAdmin, isDoctor, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [activeClinicName, setActiveClinicName] = useState('');
+
+  // Check if current URL is under a specific clinic (e.g. /clinics/:clinicId/...)
+  const clinicMatch = location.pathname.match(/^\/clinics\/([^\/]+)/);
+  const activeClinicId = clinicMatch && clinicMatch[1] !== 'new' ? clinicMatch[1] : null;
+
+  // Load clinic name if in sub-clinic view
+  useEffect(() => {
+    if (activeClinicId) {
+      clinicAPI.getClinicById(activeClinicId).then(res => {
+        const cData = res.data?.data || res.data;
+        if (cData?.name) setActiveClinicName(cData.name);
+      }).catch(() => setActiveClinicName('Clinic'));
+    } else {
+      setActiveClinicName('');
+    }
+  }, [activeClinicId]);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  const navSections = [
-    {
-      title: 'Main',
-      items: [
-        { title: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
-        { title: 'Analytics', path: '/analytics', icon: <BarChart3 size={18} />, permission: 'stats' },
-        ...(isAdmin ? [{ title: 'Security Audit', path: '/security', icon: <ShieldCheck size={18} /> }] : []),
-      ]
-    },
-    {
-      title: 'Core Medical',
-      items: [
-        ...(isAdmin ? [{ title: 'Clinics Directory', path: '/clinics', icon: <Hospital size={18} /> }] : []),
-        { title: 'Patients', path: '/patients', icon: <UserCheck size={18} />, permission: 'patients' },
-        { title: 'Appointments', path: '/appointments', icon: <CalendarDays size={18} />, permission: 'appointments' },
-        { title: 'Prescriptions', path: '/prescriptions', icon: <FileSpreadsheet size={18} />, permission: 'prescriptions' },
-      ]
-    },
-    {
-      title: 'Assets & Forms',
-      items: [
-        { title: 'Medicines', path: '/medicines', icon: <Pill size={18} />, permission: 'medicines' },
-        { title: 'Labs & Tests', path: '/labs', icon: <FlaskConical size={18} />, permission: 'labs' },
-        { title: 'Certificates', path: '/certificates', icon: <FileBadge size={18} />, permission: 'certificates' },
-        { title: 'Instructions', path: '/instructions', icon: <FileText size={18} />, permission: 'instructions' },
-        { title: 'Consents', path: '/consents', icon: <ClipboardCheck size={18} />, permission: 'consents' },
-        { title: 'Templates', path: '/templates', icon: <Layout size={18} />, permission: 'templates' },
-      ]
-    },
-    {
-      title: 'Management',
-      items: [
-        ...((isAdmin || isDoctor) ? [{ title: 'Users & Staff', path: '/users', icon: <Users size={18} /> }] : []),
-        ...(isAdmin ? [
-          { title: 'Access Control', path: '/access-control', icon: <Lock size={18} /> },
-          { title: 'Audit Logs', path: '/audit-logs', icon: <ListOrdered size={18} /> }
-        ] : []),
-        { title: 'Settings', path: '/settings', icon: <Settings size={18} /> },
-      ]
-    }
-  ];
-
-  // Filter sections and items based on role and staff permissions
-  const filteredSections = navSections.map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      if (isAdmin || isDoctor) return true;
-      // Staff permission check
-      if (!item.permission) return true; // general items like Dashboard/Settings allowed
-      return hasPermission(item.permission);
-    })
-  })).filter(section => section.items.length > 0);
-
   const getInitials = (name) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  // 1. NESTED CLINIC DEDICATED SUB-SIDEBAR (When Admin is inside /clinics/:clinicId)
+  if (isAdmin && activeClinicId) {
+    const clinicNavItems = [
+      { title: 'Clinic Overview', path: `/clinics/${activeClinicId}`, icon: <Hospital size={18} /> },
+      { title: 'Patients', path: `/clinics/${activeClinicId}/patients`, icon: <UserCheck size={18} /> },
+      { title: 'Appointments', path: `/clinics/${activeClinicId}/appointments`, icon: <CalendarDays size={18} /> },
+      { title: 'Prescriptions', path: `/clinics/${activeClinicId}/prescriptions`, icon: <FileSpreadsheet size={18} /> },
+      { title: 'Certificates', path: `/clinics/${activeClinicId}/certificates`, icon: <FileBadge size={18} /> },
+      { title: 'Instructions', path: `/clinics/${activeClinicId}/instructions`, icon: <FileText size={18} /> },
+      { title: 'Consents', path: `/clinics/${activeClinicId}/consents`, icon: <ClipboardCheck size={18} /> },
+      { title: 'Templates', path: `/clinics/${activeClinicId}/templates`, icon: <Layout size={18} /> },
+      { title: 'Settings', path: `/clinics/${activeClinicId}/settings`, icon: <Settings size={18} /> },
+    ];
+
+    return (
+      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-logo">AD</div>
+          {!isCollapsed && (
+            <div className="sidebar-brand-wrapper">
+              <span className="sidebar-brand">{activeClinicName || 'Clinic View'}</span>
+              <span className="sidebar-subbrand">Dedicated Clinic Scope</span>
+            </div>
+          )}
+          <button className="menu-toggle" onClick={onToggleCollapse}>
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+
+        {/* Back to All Clinics Button */}
+        {!isCollapsed && (
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
+            <NavLink to="/clinics" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'flex-start', gap: '6px', fontSize: '12px' }}>
+              <ArrowLeft size={14} /> Back to All Clinics
+            </NavLink>
+          </div>
+        )}
+
+        <nav className="sidebar-nav">
+          <div className="sidebar-section">
+            {!isCollapsed && <div className="sidebar-section-title">Clinic Data & Options</div>}
+            {clinicNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === `/clinics/${activeClinicId}`}
+                className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+                onClick={onCloseMobile}
+                title={isCollapsed ? item.title : ''}
+              >
+                <span className="sidebar-nav-icon">{item.icon}</span>
+                {!isCollapsed && <span>{item.title}</span>}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+
+        {user && (
+          <div className="sidebar-footer">
+            <div className="sidebar-user-avatar" title={user.full_name}>
+              {getInitials(user.full_name)}
+            </div>
+            {!isCollapsed && (
+              <div className="sidebar-user-info" style={{ flex: 1, minWidth: 0 }}>
+                <span className="sidebar-user-name">{user.full_name}</span>
+                <span className="sidebar-user-role">Master Admin</span>
+              </div>
+            )}
+            <button className="icon-btn" onClick={handleLogout} title="Logout" style={{ padding: '6px', color: 'var(--color-danger)' }}>
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
+      </aside>
+    );
+  }
+
+  // 2. TOP-LEVEL MAIN SIDEBAR (For Master Admin Top View, or Doctor/Staff View)
+  const navSections = [
+    ...(isAdmin ? [
+      {
+        title: 'Governance',
+        items: [
+          { title: 'Analytics', path: '/analytics', icon: <BarChart3 size={18} /> },
+          { title: 'Security Audit', path: '/security', icon: <ShieldCheck size={18} /> },
+          { title: 'Clinics Directory', path: '/clinics', icon: <Hospital size={18} /> },
+          { title: 'Access Control', path: '/access-control', icon: <Lock size={18} /> },
+          { title: 'Settings', path: '/settings', icon: <Settings size={18} /> },
+        ]
+      }
+    ] : [
+      {
+        title: 'Clinic Medical Data',
+        items: [
+          { title: 'Clinic Dashboard', path: '/dashboard', icon: <Layout size={18} /> },
+          { title: 'Patients', path: '/patients', icon: <UserCheck size={18} />, permission: 'patients' },
+          { title: 'Appointments', path: '/appointments', icon: <CalendarDays size={18} />, permission: 'appointments' },
+          { title: 'Prescriptions', path: '/prescriptions', icon: <FileSpreadsheet size={18} />, permission: 'prescriptions' },
+          { title: 'Certificates', path: '/certificates', icon: <FileBadge size={18} />, permission: 'certificates' },
+          { title: 'Instructions', path: '/instructions', icon: <FileText size={18} />, permission: 'instructions' },
+          { title: 'Consents', path: '/consents', icon: <ClipboardCheck size={18} />, permission: 'consents' },
+          { title: 'Templates', path: '/templates', icon: <Layout size={18} />, permission: 'templates' },
+          { title: 'Medicines', path: '/medicines', icon: <Pill size={18} />, permission: 'medicines' },
+          { title: 'Labs & Tests', path: '/labs', icon: <FlaskConical size={18} />, permission: 'labs' },
+          { title: 'Users & Staff', path: '/users', icon: <Users size={18} /> },
+          { title: 'Settings', path: '/settings', icon: <Settings size={18} /> },
+        ]
+      }
+    ])
+  ];
+
+  // Filter sections for staff permissions
+  const filteredSections = navSections.map(section => ({
+    ...section,
+    items: section.items.filter(item => {
+      if (isAdmin || isDoctor) return true;
+      if (!item.permission) return true;
+      return hasPermission(item.permission);
+    })
+  })).filter(section => section.items.length > 0);
 
   return (
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
@@ -97,15 +185,11 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
         <div className="sidebar-logo">AD</div>
         {!isCollapsed && (
           <div className="sidebar-brand-wrapper">
-            <span className="sidebar-brand">Adixon App</span>
-            <span className="sidebar-subbrand">Healthcare Dashboard</span>
+            <span className="sidebar-brand">Adixon System</span>
+            <span className="sidebar-subbrand">{user?.role === 'admin' ? 'Master Admin Scope' : 'Clinic Dashboard'}</span>
           </div>
         )}
-        <button 
-          className="menu-toggle" 
-          onClick={onToggleCollapse}
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
+        <button className="menu-toggle" onClick={onToggleCollapse}>
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
@@ -141,12 +225,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
               <span className="sidebar-user-role">{user.role}</span>
             </div>
           )}
-          <button 
-            className="icon-btn" 
-            onClick={handleLogout} 
-            title="Logout"
-            style={{ padding: '6px', color: 'var(--color-danger)' }}
-          >
+          <button className="icon-btn" onClick={handleLogout} title="Logout" style={{ padding: '6px', color: 'var(--color-danger)' }}>
             <LogOut size={16} />
           </button>
         </div>

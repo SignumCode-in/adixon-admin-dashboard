@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { prescriptionAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { FileSpreadsheet, PlusCircle, Search, User, ArrowLeft, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, PlusCircle, Search, User, ArrowLeft, Trash2, Plus } from 'lucide-react';
 
 export default function Prescriptions() {
   const { user } = useAuth();
@@ -27,18 +27,32 @@ export default function Prescriptions() {
   const [selectedPatientId, setSelectedPatientId] = useState('');
   
   // Vitals
-  const [temp, setTemp] = useState('');
-  const [bp, setBp] = useState('');
-  const [pulse, setPulse] = useState('');
-  const [spo2, setSpo2] = useState('');
-  const [weight, setWeight] = useState('');
+  const [temp, setTemp] = useState('98.6');
+  const [bp, setBp] = useState('120/80');
+  const [pulse, setPulse] = useState('72');
+  const [spo2, setSpo2] = useState('98');
+  const [weight, setWeight] = useState('65');
+  const [height, setHeight] = useState('170');
+  const [bloodSugar, setBloodSugar] = useState('');
+  const [hemoglobin, setHemoglobin] = useState('');
+  const [respirationRate, setRespirationRate] = useState('');
   
   // Clinical
   const [complaint, setComplaint] = useState('');
+  const [allergy, setAllergy] = useState('');
   const [history, setHistory] = useState('');
   const [findings, setFindings] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatment, setTreatment] = useState('');
+  const [notes, setNotes] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpTime, setFollowUpTime] = useState('');
+  const [followUpPurpose, setFollowUpPurpose] = useState('');
+
+  // Dynamic Medicines Array
+  const [medicines, setMedicines] = useState([
+    { name: '', quantity: 1, frequency: '1-0-1', route: 'Oral', no_of_days: 5, instruction: 'After Food', additional_comments: '' }
+  ]);
 
   const loadData = async () => {
     setLoading(true);
@@ -72,13 +86,40 @@ export default function Prescriptions() {
     setPulse('72');
     setSpo2('98');
     setWeight('65');
+    setHeight('170');
+    setBloodSugar('');
+    setHemoglobin('');
+    setRespirationRate('');
     setComplaint('');
+    setAllergy('');
     setHistory('');
     setFindings('');
     setDiagnosis('');
     setTreatment('');
+    setNotes('');
+    setFollowUpDate('');
+    setFollowUpTime('');
+    setFollowUpPurpose('');
+    setMedicines([{ name: '', quantity: 1, frequency: '1-0-1', route: 'Oral', no_of_days: 5, instruction: 'After Food', additional_comments: '' }]);
     setError('');
     setViewMode('editor');
+  };
+
+  const handleAddMedicineRow = () => {
+    setMedicines([
+      ...medicines,
+      { name: '', quantity: 1, frequency: '1-0-1', route: 'Oral', no_of_days: 5, instruction: 'After Food', additional_comments: '' }
+    ]);
+  };
+
+  const handleMedicineChange = (index, field, value) => {
+    const updated = [...medicines];
+    updated[index][field] = value;
+    setMedicines(updated);
+  };
+
+  const handleRemoveMedicineRow = (index) => {
+    setMedicines(medicines.filter((_, i) => i !== index));
   };
 
   const triggerDelete = (id) => {
@@ -117,14 +158,24 @@ export default function Prescriptions() {
         pulse_rate: pulse ? Number(pulse) : null,
         spo2: spo2 ? Number(spo2) : null,
         weight: weight ? Number(weight) : null,
+        height: height ? Number(height) : null,
+        blood_sugar: bloodSugar ? Number(bloodSugar) : null,
+        hemoglobin: hemoglobin ? Number(hemoglobin) : null,
+        respiration_rate: respirationRate ? Number(respirationRate) : null,
       },
       clinical: {
         chief_complaint: complaint,
+        allergy,
         patient_history: history,
         findings,
         diagnosis,
         treatment,
-      }
+        notes,
+        follow_up_date: followUpDate || null,
+        follow_up_time: followUpTime || '',
+        follow_up_purpose: followUpPurpose || '',
+      },
+      medicines: medicines.filter(m => m.name.trim() !== ''),
     };
 
     try {
@@ -143,7 +194,6 @@ export default function Prescriptions() {
     p.clinical?.diagnosis?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Full Page Screen Editor
   if (viewMode === 'editor') {
     return (
       <div>
@@ -156,8 +206,8 @@ export default function Prescriptions() {
             >
               <ArrowLeft size={16} /> Back to Prescriptions List
             </button>
-            <h1 className="page-title">Write Rx Prescription Document</h1>
-            <p className="page-subtitle">Record clinical vitals, chief complaints, diagnosis, and prescribed medicine schedules</p>
+            <h1 className="page-title">Write Full Rx Prescription</h1>
+            <p className="page-subtitle">Record clinical vitals, symptom checks, diagnoses, follow-up dates, and medicine schedules</p>
           </div>
         </div>
 
@@ -170,7 +220,7 @@ export default function Prescriptions() {
 
           <form onSubmit={handleFormSubmit}>
             <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label className="form-label" style={{ fontWeight: 'bold' }}>Patient Profile *</label>
+              <label className="form-label" style={{ fontWeight: 'bold' }}>Select Patient *</label>
               <select className="input-field" value={selectedPatientId} onChange={(e) => setSelectedPatientId(e.target.value)} required>
                 {patients.map((p) => (
                   <option key={p._id} value={p._id}>{p.full_name} ({p.phone})</option>
@@ -185,47 +235,109 @@ export default function Prescriptions() {
                 <input type="text" className="input-field" placeholder="120/80" value={bp} onChange={(e) => setBp(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Pulse Rate (bpm)</label>
+                <label className="form-label">Pulse (bpm)</label>
                 <input type="number" className="input-field" placeholder="72" value={pulse} onChange={(e) => setPulse(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Body Temp (°F)</label>
+                <label className="form-label">Temp (°F)</label>
                 <input type="text" className="input-field" placeholder="98.6" value={temp} onChange={(e) => setTemp(e.target.value)} />
               </div>
             </div>
-
             <div className="form-row" style={{ marginBottom: '20px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">SPO2 (%)</label>
                 <input type="number" className="input-field" placeholder="98" value={spo2} onChange={(e) => setSpo2(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">Body Weight (kg)</label>
+                <label className="form-label">Weight (kg)</label>
                 <input type="number" className="input-field" placeholder="65" value={weight} onChange={(e) => setWeight(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Height (cm)</label>
+                <input type="number" className="input-field" placeholder="170" value={height} onChange={(e) => setHeight(e.target.value)} />
               </div>
             </div>
 
-            <h4 style={{ fontSize: '14px', fontWeight: 'bold', margin: '20px 0 12px', color: 'var(--color-primary)' }}>2. Clinical Findings & Diagnosis</h4>
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label">Chief Complaint *</label>
-              <input type="text" className="input-field" placeholder="Tooth pain, bleeding gums" value={complaint} onChange={(e) => setComplaint(e.target.value)} required />
+            <h4 style={{ fontSize: '14px', fontWeight: 'bold', margin: '20px 0 12px', color: 'var(--color-primary)' }}>2. Clinical Assessment & Diagnosis</h4>
+            <div className="form-row" style={{ marginBottom: '12px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Chief Complaint *</label>
+                <input type="text" className="input-field" placeholder="Severe tooth pain" value={complaint} onChange={(e) => setComplaint(e.target.value)} required />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Allergies</label>
+                <input type="text" className="input-field" placeholder="Penicillin, Dust" value={allergy} onChange={(e) => setAllergy(e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row" style={{ marginBottom: '12px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Clinical Findings</label>
+                <input type="text" className="input-field" placeholder="Cavity on upper molar" value={findings} onChange={(e) => setFindings(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Clinical Diagnosis *</label>
+                <input type="text" className="input-field" placeholder="Acute Pulpitis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} required />
+              </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label">Clinical Diagnosis *</label>
-              <input type="text" className="input-field" placeholder="e.g. Gingivitis, Acute Pulpitis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} required />
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label">Treatment Plan / Notes</label>
+              <textarea className="input-field" placeholder="RCT advised, prescribe analgesics..." value={treatment} onChange={(e) => setTreatment(e.target.value)} />
             </div>
 
-            <div className="form-group" style={{ marginBottom: '24px' }}>
-              <label className="form-label">Rx Treatment Plan (Medicines, Dosage & Schedule) *</label>
-              <textarea
-                className="input-field"
-                style={{ height: '100px', fontFamily: 'inherit', resize: 'none' }}
-                placeholder="e.g. Tab Amoxicillin 500mg - 3 times a day for 5 days after meals"
-                value={treatment}
-                onChange={(e) => setTreatment(e.target.value)}
-                required
-              />
+            <h4 style={{ fontSize: '14px', fontWeight: 'bold', margin: '20px 0 12px', color: 'var(--color-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>3. Prescribed Medicines ({medicines.length})</span>
+              <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={handleAddMedicineRow}>
+                + Add Medicine
+              </button>
+            </h4>
+
+            {medicines.map((med, mIdx) => (
+              <div key={mIdx} style={{ background: 'var(--color-bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' }}>
+                <div className="form-row" style={{ marginBottom: '6px' }}>
+                  <div className="form-group" style={{ flex: 2 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Medicine Name *</label>
+                    <input type="text" className="input-field" placeholder="e.g. Amoxicillin 500mg" required value={med.name} onChange={(e) => handleMedicineChange(mIdx, 'name', e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Frequency</label>
+                    <input type="text" className="input-field" placeholder="1-0-1" value={med.frequency} onChange={(e) => handleMedicineChange(mIdx, 'frequency', e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Days</label>
+                    <input type="number" className="input-field" placeholder="5" value={med.no_of_days} onChange={(e) => handleMedicineChange(mIdx, 'no_of_days', e.target.value)} />
+                  </div>
+                  <button type="button" className="icon-btn" style={{ color: 'var(--color-danger)', alignSelf: 'flex-end', marginBottom: '4px' }} onClick={() => handleRemoveMedicineRow(mIdx)}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="form-row">
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Instruction</label>
+                    <input type="text" className="input-field" placeholder="After Meals" value={med.instruction} onChange={(e) => handleMedicineChange(mIdx, 'instruction', e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Route</label>
+                    <input type="text" className="input-field" placeholder="Oral" value={med.route} onChange={(e) => handleMedicineChange(mIdx, 'route', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <h4 style={{ fontSize: '14px', fontWeight: 'bold', margin: '20px 0 12px', color: 'var(--color-primary)' }}>4. Follow-Up Schedule</h4>
+            <div className="form-row" style={{ marginBottom: '24px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Follow-up Date</label>
+                <input type="date" className="input-field" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Time Slot</label>
+                <input type="text" className="input-field" placeholder="10:00 AM" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Purpose</label>
+                <input type="text" className="input-field" placeholder="Root Canal Review" value={followUpPurpose} onChange={(e) => setFollowUpPurpose(e.target.value)} />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -284,46 +396,42 @@ export default function Prescriptions() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading prescriptions...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No prescriptions documented.</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No prescriptions created.</div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
                 <th>Patient</th>
-                <th>Vitals Checked</th>
-                <th>Chief Complaints</th>
-                <th>Diagnosis Summary</th>
-                <th>Treatment Prescribed</th>
-                <th>Doctor</th>
-                <th>Created Date</th>
+                <th>Chief Complaint</th>
+                <th>Diagnosis</th>
+                <th>Medicines Count</th>
+                <th>Vitals (BP/Pulse/Temp)</th>
+                <th>Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
-                <tr key={p._id}>
+              {filtered.map((pr) => (
+                <tr key={pr._id}>
                   <td style={{ fontWeight: 'bold' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <User size={16} color="var(--color-primary)" />
-                      {p.patient_id?.full_name || 'Walk-in'}
+                      {pr.patient_id?.full_name || 'Patient'}
                     </span>
                   </td>
-                  <td style={{ fontSize: '11px', lineHeight: 1.3 }}>
-                    BP: {p.vitals?.blood_pressure || 'N/A'}<br />
-                    PR: {p.vitals?.pulse_rate || 'N/A'} bpm<br />
-                    Temp: {p.vitals?.temperature || 'N/A'} °F
+                  <td>{pr.clinical?.chief_complaint || 'N/A'}</td>
+                  <td style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                    {pr.clinical?.diagnosis || pr.diagnosis || 'General'}
                   </td>
-                  <td>{p.clinical?.chief_complaint || 'N/A'}</td>
                   <td>
-                    <span className="badge badge-warning" style={{ textTransform: 'capitalize' }}>
-                      {p.clinical?.diagnosis || 'Unspecified'}
-                    </span>
+                    <span className="badge badge-info">{pr.medicines?.length || 0} Meds</span>
                   </td>
-                  <td style={{ fontSize: '12px' }}>{p.clinical?.treatment || 'N/A'}</td>
-                  <td>{p.doctor_id?.full_name || 'Practitioner'}</td>
-                  <td>{new Date(p.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(p._id)}>
+                    {pr.vitals ? `${pr.vitals.blood_pressure || '-'} BP | ${pr.vitals.pulse_rate || '-'} bpm | ${pr.vitals.temperature || '-'} °F` : '-'}
+                  </td>
+                  <td>{new Date(pr.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(pr._id)} title="Delete prescription">
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -334,16 +442,12 @@ export default function Prescriptions() {
         )}
       </div>
 
-      {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal
         isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setDeleteId(null);
-        }}
+        onClose={() => { setDeleteModalOpen(false); setDeleteId(null); }}
         onConfirm={confirmDelete}
-        title="Delete Prescription Slip"
-        message="Are you sure you want to delete this Rx prescription record?"
+        title="Delete Prescription"
+        message="Are you sure you want to delete this prescription?"
         loading={deleteLoading}
       />
     </div>

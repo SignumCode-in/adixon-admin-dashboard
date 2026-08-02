@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { patientAPI, dashboardAPI, appointmentAPI, instructionAPI, consentAPI, prescriptionAPI, labAPI, certificateAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
@@ -17,10 +18,12 @@ import {
   Clipboard,
   X,
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 
 export default function Patients() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -793,11 +796,12 @@ export default function Patients() {
               </thead>
               <tbody>
                 {filtered.map((p) => (
-                  <tr key={p._id} style={{ cursor: 'pointer' }} onClick={() => handleOpenProfile(p)}>
+                  <tr key={p._id} onClick={() => navigate(`/patients/${p._id}`)} style={{ cursor: 'pointer' }}>
                     <td style={{ fontWeight: 'bold' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <User size={16} color="var(--color-primary)" />
-                        <span style={{ textDecoration: 'underline' }}>{p.full_name}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
+                        <User size={16} />
+                        <span>{p.full_name}</span>
+                        <ExternalLink size={12} style={{ opacity: 0.7 }} />
                       </span>
                     </td>
                     <td>{p.age} Yrs / {p.gender}</td>
