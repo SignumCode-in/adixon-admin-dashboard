@@ -1,0 +1,162 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authAPI, userAPI } from '../services/api';
+import { auth, googleProvider } from '../config/firebase';
+import { signInWithPopup } from 'firebase/auth';
+
+const AuthContext = createContext(null);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+
+  // Load user from localStorage on initialization
+  useEffect(() => {
+    const savedToken = localStorage.getItem('id_token');
+    const savedUser = localStorage.getItem('user');
+
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
+  }, []);
+
+  // Update theme in DOM & localStorage
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
+
+  const loginUser = async (email, password) => {
+    setLoading(true);
+    try {
+      // 1. Generate Firebase token via backend endpoint
+      const tokenRes = await authAPI.generateToken(email, password);
+      const idToken = tokenRes.data.id_token;
+      const refreshToken = tokenRes.data.refresh_token;
+
+      // 2. Pass ID token to login route to load user from MongoDB
+      const loginRes = await authAPI.login(idToken);
+      const userProfile = loginRes.data.user;
+
+      // 3. Save to state & storage
+      setToken(idToken);
+      setUser(userProfile);
+      localStorage.setItem('id_token', idToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      localStorage.setItem('user', JSON.stringify(userProfile));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+      const refreshToken = result.user.refreshToken;
+
+      const loginRes = await authAPI.login(idToken);
+      const userProfile = loginRes.data.user;
+
+      setToken(idToken);
+      setUser(userProfile);
+      localStorage.setItem('id_token', idToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      localStorage.setItem('user', JSON.stringify(userProfile));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Google login failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerUser = async (registrationData) => {
+    setLoading(true);
+    try {
+      // Create user (and clinic, if doctor role)
+      const res = await userAPI.createUser(registrationData);
+      return res;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logoutUser = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear state and localStorage
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+    }
+  };
+
+  const hasPermission = (perm) => {
+    if (!user) return false;
+    if (user.role === 'admin' || user.role === 'doctor') return true;
+    if (user.role === 'staff') {
+      const perms = user.permissions || [];
+      return perms.includes(perm);
+    }
+    return false;
+  };
+
+  const isAdmin = user?.role === 'admin';
+  const isDoctor = user?.role === 'doctor';
+  const isStaff = user?.role === 'staff';
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        theme,
+        toggleTheme,
+        login: loginUser,
+        loginWithGoogle,
+        register: registerUser,
+        logout: logoutUser,
+        setUser,
+        hasPermission,
+        isAdmin,
+        isDoctor,
+        isStaff,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
