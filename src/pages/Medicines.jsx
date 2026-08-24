@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { medicineAPI } from '../services/api';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { Pill, PlusCircle, Search, Trash2, Edit2, ArrowLeft } from 'lucide-react';
+import ExcelUploadModal from '../components/ExcelUploadModal';
+import { Pill, PlusCircle, Search, Trash2, Edit2, ArrowLeft, FileSpreadsheet } from 'lucide-react';
+
 
 export default function Medicines() {
   const [medicines, setMedicines] = useState([]);
@@ -21,6 +23,9 @@ export default function Medicines() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Upload Excel Modal State
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -265,9 +270,14 @@ export default function Medicines() {
           <h1 className="page-title">Medication Catalogue</h1>
           <p className="page-subtitle">Manage clinical prescriptions stocks, dosage frequencies, and intake instructions</p>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenAdd}>
-          <PlusCircle size={14} /> Add Medicine
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-secondary" onClick={() => setUploadModalOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <FileSpreadsheet size={16} /> Import Excel
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenAdd}>
+            <PlusCircle size={14} /> Add Medicine
+          </button>
+        </div>
       </div>
 
       {success && (
@@ -360,6 +370,16 @@ export default function Medicines() {
         title="Delete Medicine Item"
         message="Are you sure you want to delete this medicine listing from the catalogue?"
         loading={deleteLoading}
+      />
+
+      {/* Excel Upload Modal */}
+      <ExcelUploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={(msg) => {
+          setSuccess(msg);
+          loadMedicines();
+        }}
       />
     </div>
   );

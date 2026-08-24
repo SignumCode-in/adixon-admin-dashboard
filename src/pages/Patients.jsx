@@ -30,8 +30,9 @@ export default function Patients() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Search
+  // Search & Master Admin Clinic Filter
   const [search, setSearch] = useState('');
+  const [filterClinicId, setFilterClinicId] = useState('all');
 
   // Page View Mode: 'list' | 'editor'
   const [viewMode, setViewMode] = useState('list');
@@ -166,7 +167,11 @@ export default function Patients() {
     setLoading(true);
     setError('');
     try {
-      const res = await patientAPI.getPatients();
+      const params = { limit: 200 };
+      if (user?.role === 'admin' && filterClinicId && filterClinicId !== 'all') {
+        params.clinic_id = filterClinicId;
+      }
+      const res = await patientAPI.getPatients(params);
       if (res && res.data) {
         setPatients(res.data);
       }
@@ -207,7 +212,10 @@ export default function Patients() {
 
   useEffect(() => {
     loadPatients();
-  }, []);
+    if (user?.role === 'admin') {
+      loadDefaultMasterData();
+    }
+  }, [filterClinicId]);
 
   const handleOpenAdd = () => {
     setIsEdit(false);
@@ -763,7 +771,7 @@ export default function Patients() {
           </div>
         )}
 
-        <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
+        <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
             <input
               type="text"
@@ -775,6 +783,25 @@ export default function Patients() {
             />
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
           </div>
+
+          {user?.role === 'admin' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label className="form-label" style={{ fontSize: '13px', margin: 0, whiteSpace: 'nowrap', fontWeight: 'bold' }}>
+                Filter Clinic:
+              </label>
+              <select
+                className="input-field"
+                style={{ maxWidth: '240px', fontSize: '13px' }}
+                value={filterClinicId}
+                onChange={(e) => setFilterClinicId(e.target.value)}
+              >
+                <option value="all">All Clinics (Master Admin)</option>
+                {clinicsList.map(c => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="table-responsive">
@@ -789,6 +816,7 @@ export default function Patients() {
                   <th>Patient Name</th>
                   <th>Age / Gender</th>
                   <th>Phone Number</th>
+                  {user?.role === 'admin' && <th>Clinic Facility</th>}
                   <th>Blood Group</th>
                   <th>Allergies</th>
                   <th>Actions</th>
@@ -806,6 +834,11 @@ export default function Patients() {
                     </td>
                     <td>{p.age} Yrs / {p.gender}</td>
                     <td>{p.phone}</td>
+                    {user?.role === 'admin' && (
+                      <td>
+                        <span className="badge badge-info">{p.clinic_id?.name || 'Clinic'}</span>
+                      </td>
+                    )}
                     <td>
                       <span className="badge badge-info">{p.blood_group || 'Unknown'}</span>
                     </td>

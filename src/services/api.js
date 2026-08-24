@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.0.100:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.0.100:3000/api/v1';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -169,6 +169,26 @@ export const medicineAPI = {
   },
   deleteMedicine: async (id) => {
     const response = await apiClient.delete(`/medicines/${id}`);
+    return response.data;
+  },
+  getMedicineOptions: async () => {
+    const response = await apiClient.get('/medicines/options');
+    return response.data;
+  },
+  addMedicineOption: async (data) => {
+    const response = await apiClient.post('/medicines/options', data);
+    return response.data;
+  },
+  deleteMedicineOption: async (data) => {
+    const response = await apiClient.delete('/medicines/options', { data });
+    return response.data;
+  },
+  bulkUploadMedicines: async (formData) => {
+    const response = await apiClient.post('/medicines/bulk-upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };

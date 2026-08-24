@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { userAPI, clinicAPI } from '../services/api';
-import { User, Hospital, Key, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { userAPI, clinicAPI, medicineAPI } from '../services/api';
+import { User, Hospital, Key, Save, RefreshCw, CheckCircle2, Pill, Plus, X, Trash2 } from 'lucide-react';
 
 export default function Settings() {
   const { user, login } = useAuth();
   
-  // Tabs: 'profile' | 'clinic' | 'security'
+  // Tabs: 'profile' | 'clinic' | 'security' | 'medicine_presets'
   const [activeTab, setActiveTab] = useState('profile');
   
   // UI states
@@ -41,6 +41,63 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Master Admin Medicine Presets States (Routes, Frequencies, Instructions)
+  const [routesList, setRoutesList] = useState([]);
+  const [frequenciesList, setFrequenciesList] = useState([]);
+  const [instructionsList, setInstructionsList] = useState([]);
+  const [newRouteInput, setNewRouteInput] = useState('');
+  const [newFreqInput, setNewFreqInput] = useState('');
+  const [newInstructionInput, setNewInstructionInput] = useState('');
+
+  const loadMedicineOptions = async () => {
+    try {
+      const res = await medicineAPI.getMedicineOptions();
+      if (res && res.data) {
+        setRoutesList(res.data.routes || []);
+        setFrequenciesList(res.data.frequencies || []);
+        setInstructionsList(res.data.instructions || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch medicine options:', err);
+    }
+  };
+
+  const handleAddOption = async (type, value) => {
+    if (!value || !value.trim()) return;
+    setSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await medicineAPI.addMedicineOption({ type, value: value.trim() });
+      setSuccessMsg(`Added new ${type} option: "${value.trim()}"`);
+      if (type === 'route') setNewRouteInput('');
+      if (type === 'frequency') setNewFreqInput('');
+      if (type === 'instruction') setNewInstructionInput('');
+      await loadMedicineOptions();
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.message || `Failed to add ${type} option.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteOption = async (type, value) => {
+    setSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await medicineAPI.deleteMedicineOption({ type, value });
+      setSuccessMsg(`Removed ${type} option: "${value}"`);
+      await loadMedicineOptions();
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.message || `Failed to delete ${type} option.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Load User & Clinic initial settings data
   const loadInitialSettings = async () => {
     setLoading(true);
@@ -53,6 +110,8 @@ export default function Settings() {
         setQualification(user.qualification || '');
         setRegNumber(user.registration_number || '');
       }
+
+      await loadMedicineOptions();
 
       // Fetch user's assigned clinic
       const res = await clinicAPI.getClinics();
@@ -275,6 +334,27 @@ export default function Settings() {
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
               <Key size={18} /> Password Security
+            </span>
+          </div>
+
+          <div
+            className={`settings-nav-item ${activeTab === 'medicine_presets' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('medicine_presets');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            style={{ 
+              padding: '12px 16px', 
+              borderRadius: '8px', 
+              cursor: 'pointer',
+              fontWeight: activeTab === 'medicine_presets' ? '600' : '500',
+              backgroundColor: activeTab === 'medicine_presets' ? 'var(--color-primary-light)' : 'transparent',
+              color: activeTab === 'medicine_presets' ? 'var(--color-primary)' : 'var(--color-text-secondary)'
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+              <Pill size={18} /> Medicine Presets
             </span>
           </div>
         </div>
@@ -524,6 +604,166 @@ export default function Settings() {
                     </button>
                   </div>
                 </form>
+              )}
+
+              {/* Tab 4: Medicine Presets & Options (Master Admin) */}
+              {activeTab === 'medicine_presets' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0, color: 'var(--color-text-primary)' }}>
+                        Medicine Prescription Presets & Configs
+                      </h3>
+                      <p style={{ fontSize: '13px', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>
+                        Manage master options for Medicine Routes, Frequencies, and Timing Instructions used across all prescription forms
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* SECTION 1: MEDICINE ROUTES */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '18px', marginBottom: '20px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Pill size={16} /> Medicine Routes / Types ({routesList.length})
+                    </h4>
+
+                    {/* Quick Add Route */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', maxWidth: '440px' }}>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Add new route (e.g. Inhalation, Sublingual)..."
+                        value={newRouteInput}
+                        onChange={(e) => setNewRouteInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddOption('route', newRouteInput);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ padding: '6px 14px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                        onClick={() => handleAddOption('route', newRouteInput)}
+                      >
+                        <Plus size={14} /> Add Route
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {routesList.map((routeVal, rIdx) => (
+                        <div key={rIdx} className="badge badge-info" style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{routeVal}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOption('route', routeVal)}
+                            style={{ background: 'none', border: 'none', color: 'currentColor', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={`Remove ${routeVal}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: MEDICINE FREQUENCIES */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '18px', marginBottom: '20px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Pill size={16} /> Dosage Frequencies ({frequenciesList.length})
+                    </h4>
+
+                    {/* Quick Add Frequency */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', maxWidth: '440px' }}>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Add new frequency (e.g. Q4H, 1-0-1-1, Weekly)..."
+                        value={newFreqInput}
+                        onChange={(e) => setNewFreqInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddOption('frequency', newFreqInput);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ padding: '6px 14px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                        onClick={() => handleAddOption('frequency', newFreqInput)}
+                      >
+                        <Plus size={14} /> Add Frequency
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {frequenciesList.map((freqVal, fIdx) => (
+                        <div key={fIdx} className="badge badge-info" style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{freqVal}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOption('frequency', freqVal)}
+                            style={{ background: 'none', border: 'none', color: 'currentColor', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={`Remove ${freqVal}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: MEDICINE INSTRUCTIONS */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '18px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Pill size={16} /> Timing Instructions ({instructionsList.length})
+                    </h4>
+
+                    {/* Quick Add Instruction */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', maxWidth: '440px' }}>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Add new instruction (e.g. With Warm Milk)..."
+                        value={newInstructionInput}
+                        onChange={(e) => setNewInstructionInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddOption('instruction', newInstructionInput);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ padding: '6px 14px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                        onClick={() => handleAddOption('instruction', newInstructionInput)}
+                      >
+                        <Plus size={14} /> Add Instruction
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {instructionsList.map((insVal, iIdx) => (
+                        <div key={iIdx} className="badge badge-info" style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{insVal}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOption('instruction', insVal)}
+                            style={{ background: 'none', border: 'none', color: 'currentColor', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={`Remove ${insVal}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
             </>
           )}
