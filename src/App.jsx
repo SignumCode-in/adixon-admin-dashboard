@@ -1,18 +1,29 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { ClinicProvider } from './context/ClinicContext';
-import PermissionGuard from './components/PermissionGuard';
-import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Analytics from './pages/Analytics';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
 
-// Core Medical CRUD Pages
+// Guards & Layouts
+import AdminGuard from './components/guards/AdminGuard';
+import ClinicGuard from './components/guards/ClinicGuard';
+import PermissionGuard from './components/PermissionGuard';
+import AdminLayout from './layouts/AdminLayout';
+import ClinicLayout from './layouts/ClinicLayout';
+
+// Dedicated Auth Pages
+import AdminLogin from './pages/admin/AdminLogin';
+import Login from './pages/Login';
+
+// Governance & System Admin Pages
+import Analytics from './pages/Analytics';
 import Clinics from './pages/Clinics';
 import ClinicOverview from './pages/ClinicOverview';
+import SecurityDashboard from './pages/SecurityDashboard';
+import AccessControl from './pages/AccessControl';
+import AuditLogs from './pages/AuditLogs';
+
+// Core Clinical Pages
+import Dashboard from './pages/Dashboard';
 import Patients from './pages/Patients';
 import PatientDetails from './pages/PatientDetails';
 import Appointments from './pages/Appointments';
@@ -23,23 +34,12 @@ import Certificates from './pages/Certificates';
 import Instructions from './pages/Instructions';
 import Consents from './pages/Consents';
 import Templates from './pages/Templates';
-
-// Governance & System Admin Pages
+import Users from './pages/Users';
+import Settings from './pages/Settings';
 import Kanban from './pages/Kanban';
 import Projects from './pages/Projects';
-import SecurityDashboard from './pages/SecurityDashboard';
-import AccessControl from './pages/AccessControl';
-import AuditLogs from './pages/AuditLogs';
 
 import './App.css';
-
-function RootRedirect() {
-  const { user } = useAuth();
-  if (user?.role === 'admin') {
-    return <Navigate to="/analytics" replace />;
-  }
-  return <Navigate to="/dashboard" replace />;
-}
 
 export default function App() {
   return (
@@ -47,68 +47,71 @@ export default function App() {
       <ClinicProvider>
         <BrowserRouter>
           <Routes>
-            {/* Public Auth Route */}
+            {/* ======================================================== */}
+            {/* 1. PUBLIC AUTHENTICATION ROUTING                         */}
+            {/* ======================================================== */}
+            {/* Clinic Portal Login (Healthcare Providers & Staff) */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected 3-Tier Dashboard Layout */}
-            <Route element={<Layout />}>
-              <Route path="/" element={<RootRedirect />} />
+            {/* Dedicated Master Admin Authentication */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+            {/* ======================================================== */}
+            {/* 2. MASTER ADMIN PLATFORM PORTAL (/admin/*)              */}
+            {/* ======================================================== */}
+            <Route
+              path="/admin"
+              element={
+                <AdminGuard>
+                  <AdminLayout />
+                </AdminGuard>
+              }
+            >
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<Analytics />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="clinic-dashboard" element={<Dashboard />} />
+
+              {/* Multi-Tenant Clinic Management & Deep-Dive Scope */}
+              <Route path="clinics" element={<Clinics />} />
+              <Route path="clinics/:clinicId" element={<ClinicOverview />} />
+              <Route path="clinics/:clinicId/patients" element={<Patients />} />
+              <Route path="clinics/:clinicId/appointments" element={<Appointments />} />
+              <Route path="clinics/:clinicId/prescriptions" element={<Prescriptions />} />
+              <Route path="clinics/:clinicId/certificates" element={<Certificates />} />
+              <Route path="clinics/:clinicId/instructions" element={<Instructions />} />
+              <Route path="clinics/:clinicId/consents" element={<Consents />} />
+              <Route path="clinics/:clinicId/labs" element={<Labs />} />
+              <Route path="clinics/:clinicId/templates" element={<Templates />} />
+              <Route path="clinics/:clinicId/users" element={<Users />} />
+              <Route path="clinics/:clinicId/settings" element={<Settings />} />
+
+              {/* Global Inspector */}
+              <Route path="patients/:patientId" element={<PatientDetails />} />
+
+              {/* Governance, Security & System Administration */}
+              <Route path="users" element={<Users />} />
+              <Route path="security" element={<SecurityDashboard />} />
+              <Route path="access-control" element={<AccessControl />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+
+            {/* ======================================================== */}
+            {/* 3. CLINIC OPERATIONS PORTAL (/*)                        */}
+            {/* ======================================================== */}
+            <Route
+              element={
+                <ClinicGuard>
+                  <ClinicLayout />
+                </ClinicGuard>
+              }
+            >
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/analytics" element={<Analytics />} />
-              
-              {/* User & Staff Management (Admin or Doctor) */}
-              <Route path="/users" element={<Users />} />
-              
-              {/* Master Admin Top-Level Governance Routes */}
-              <Route
-                path="/clinics"
-                element={
-                  <PermissionGuard requiredRole="admin">
-                    <Clinics />
-                  </PermissionGuard>
-                }
-              />
 
-              {/* NESTED CLINIC DEDICATED SCOPE ROUTES */}
-              <Route path="/clinics/:clinicId" element={<ClinicOverview />} />
-              <Route path="/clinics/:clinicId/patients" element={<Patients />} />
-              <Route path="/clinics/:clinicId/appointments" element={<Appointments />} />
-              <Route path="/clinics/:clinicId/prescriptions" element={<Prescriptions />} />
-              <Route path="/clinics/:clinicId/certificates" element={<Certificates />} />
-              <Route path="/clinics/:clinicId/instructions" element={<Instructions />} />
-              <Route path="/clinics/:clinicId/consents" element={<Consents />} />
-              <Route path="/clinics/:clinicId/templates" element={<Templates />} />
-              <Route path="/clinics/:clinicId/settings" element={<Settings />} />
-
-              {/* PATIENT DETAILS TABBED INSPECTOR ROUTE */}
-              <Route path="/patients/:patientId" element={<PatientDetails />} />
-
-              <Route
-                path="/security"
-                element={
-                  <PermissionGuard requiredRole="admin">
-                    <SecurityDashboard />
-                  </PermissionGuard>
-                }
-              />
-              <Route
-                path="/access-control"
-                element={
-                  <PermissionGuard requiredRole="admin">
-                    <AccessControl />
-                  </PermissionGuard>
-                }
-              />
-              <Route
-                path="/audit-logs"
-                element={
-                  <PermissionGuard requiredRole="admin">
-                    <AuditLogs />
-                  </PermissionGuard>
-                }
-              />
-
-              {/* Core Medical CRUD (Permission guarded for Staff/Doctors) */}
+              {/* Patient Management & EHR */}
               <Route
                 path="/patients"
                 element={
@@ -117,6 +120,9 @@ export default function App() {
                   </PermissionGuard>
                 }
               />
+              <Route path="/patients/:patientId" element={<PatientDetails />} />
+
+              {/* Appointments & Scheduling */}
               <Route
                 path="/appointments"
                 element={
@@ -125,6 +131,8 @@ export default function App() {
                   </PermissionGuard>
                 }
               />
+
+              {/* Prescriptions & E-Pharmacy */}
               <Route
                 path="/prescriptions"
                 element={
@@ -134,7 +142,7 @@ export default function App() {
                 }
               />
 
-              {/* Assets & Forms */}
+              {/* Medicines & Pharmacy Inventory */}
               <Route
                 path="/medicines"
                 element={
@@ -143,6 +151,8 @@ export default function App() {
                   </PermissionGuard>
                 }
               />
+
+              {/* Diagnostic Labs */}
               <Route
                 path="/labs"
                 element={
@@ -151,6 +161,8 @@ export default function App() {
                   </PermissionGuard>
                 }
               />
+
+              {/* Clinical Documentation & Legal Forms */}
               <Route
                 path="/certificates"
                 element={
@@ -184,14 +196,20 @@ export default function App() {
                 }
               />
 
-              {/* Settings & Secondary Utilities */}
+              {/* Staff Management & Clinic Settings */}
+              <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />
+
+              {/* Secondary Productivity Utilities */}
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/projects" element={<Projects />} />
             </Route>
 
-            {/* Catch-all Redirect */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* ======================================================== */}
+            {/* 4. CATCH-ALL REDIRECTS                                   */}
+            {/* ======================================================== */}
+            <Route path="/admin/*" element={<Navigate to="/admin/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </ClinicProvider>

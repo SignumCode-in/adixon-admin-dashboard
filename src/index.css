@@ -1495,17 +1495,67 @@ body {
     margin-left: 0 !important;
   }
   .topbar {
-    padding: 0 var(--sp-4);
+    padding: 0 var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .topbar-left {
+    gap: var(--sp-2);
+    min-width: 0;
+  }
+  .topbar-right {
+    gap: var(--sp-2);
+    margin-left: auto;
+  }
+  .breadcrumbs {
+    display: none;
+  }
+  .clinic-switcher-wrapper {
+    max-width: 145px;
+    padding: 2px 6px;
+  }
+  .clinic-switcher-select {
+    max-width: 115px;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .active-clinic-pill {
+    padding: 3px 8px;
+    font-size: 11px;
+    max-width: 140px;
+  }
+  .active-clinic-pill span {
+    max-width: 100px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .badge-pill {
+    padding: 2px 6px;
+    font-size: 9px;
   }
   .search-trigger {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: var(--radius-full);
     justify-content: center;
     padding: 0;
   }
   .search-trigger span, .search-trigger kbd {
     display: none;
+  }
+  .auth-wrapper {
+    padding: var(--sp-4) var(--sp-2);
+  }
+  .auth-card {
+    padding: var(--sp-6) var(--sp-4);
+    border-radius: var(--radius-md);
+    width: 100%;
+    margin: 0 auto;
+  }
+  .page-container {
+    padding: var(--sp-4);
   }
   .kpi-row {
     grid-template-columns: 1fr;
@@ -1523,7 +1573,7 @@ body {
     grid-template-columns: 1fr;
   }
   .palette-container {
-    width: 90%;
+    width: 95%;
   }
 }
 

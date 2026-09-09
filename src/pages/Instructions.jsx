@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { instructionAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { FileText, PlusCircle, Search, Trash2, Edit2, User, ArrowLeft } from 'lucide-react';
 
 export default function Instructions() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [instructions, setInstructions] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +36,11 @@ export default function Instructions() {
     setLoading(true);
     setError('');
     try {
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [instrRes, patientsRes] = await Promise.all([
-        instructionAPI.getInstructions(),
-        patientAPI.getPatients(),
+        instructionAPI.getInstructions({ ...clinicFilter, limit: 100 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
       ]);
 
       if (instrRes && instrRes.data) setInstructions(instrRes.data);
@@ -54,7 +58,7 @@ export default function Instructions() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   const handleOpenAdd = () => {
     setIsEdit(false);
@@ -103,8 +107,8 @@ export default function Instructions() {
 
     const payload = {
       patient_id: selectedPatientId,
-      doctor_id: user?._id || '6a55ce3df5878a83c6b4e275',
-      clinic_id: user?.clinic_id || '6a55ce3cf5878a83c6b4e274',
+      doctor_id: user?._id,
+      clinic_id: activeClinicId || user?.clinic_id?._id || user?.clinic_id,
       title,
       description,
     };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { userAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   UserPlus, 
@@ -12,6 +14,8 @@ import {
 } from 'lucide-react';
 
 export default function Users() {
+  const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const location = useLocation();
   
   // Data states
@@ -70,6 +74,8 @@ export default function Users() {
         search,
       };
       if (roleFilter) params.role = roleFilter;
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      if (targetClinicId) params.clinic_id = targetClinicId;
       
       const res = await userAPI.getUsers(params);
       if (res && res.data) {
@@ -87,7 +93,7 @@ export default function Users() {
 
   useEffect(() => {
     loadUsers();
-  }, [currentPage, limit, roleFilter, search]);
+  }, [currentPage, limit, roleFilter, search, activeClinicId]);
 
   const handleOpenAddModal = () => {
     setIsEdit(false);
@@ -173,6 +179,7 @@ export default function Users() {
         await userAPI.updateUser(editId, payload);
         setSuccess('User profile updated successfully.');
       } else {
+        const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
         const payload = {
           full_name: fullName,
           email,
@@ -181,7 +188,7 @@ export default function Users() {
           role,
           qualification,
           registration_number: regNumber,
-          clinic_id: '6a55ce3cf5878a83c6b4e274',
+          ...(role !== 'admin' && targetClinicId ? { clinic_id: targetClinicId } : {}),
         };
         await userAPI.createUser(payload);
         setSuccess('User created successfully.');

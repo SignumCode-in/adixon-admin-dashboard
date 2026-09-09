@@ -32,8 +32,10 @@ apiClient.interceptors.response.use(
       const isAuthRoute = error.config.url.includes('/auth/login') || error.config.url.includes('/auth/generate-token');
       if (!isAuthRoute) {
         localStorage.removeItem('id_token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        const isAdminPath = window.location.pathname.startsWith('/admin');
+        window.location.href = isAdminPath ? '/admin/login' : '/login';
       }
     }
     return Promise.reject(error);

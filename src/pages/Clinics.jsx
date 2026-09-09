@@ -380,9 +380,9 @@ export default function Clinics() {
                 <tr key={c._id}>
                   <td style={{ fontWeight: 'bold' }}>
                     <span 
-                      onClick={() => navigate(`/clinics/${c._id}`)} 
+                      onClick={() => navigate(`/admin/clinics/${c._id}`)} 
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--color-primary)' }}
-                      title="Open Clinic Scope & Dedicated Sub-Sidebar"
+                      title="Open Clinic Dashboard & Details"
                     >
                       <Hospital size={16} />
                       <span>{c.name}</span>
@@ -395,9 +395,15 @@ export default function Clinics() {
                   <td>{c.open_days || 'Mon - Sat'}</td>
                   <td>{c.visit_hours || 'N/A'}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '11px' }} onClick={() => navigate(`/clinics/${c._id}`)}>
-                        Open Scope
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }} 
+                        onClick={() => navigate(`/admin/clinics/${c._id}`)}
+                        title="View Clinic Details & Operational Dashboard"
+                      >
+                        <Hospital size={13} />
+                        View Clinic
                       </button>
                       <button className="icon-btn" onClick={() => handleOpenEdit(c)} title="Edit clinic info">
                         <Edit2 size={14} />

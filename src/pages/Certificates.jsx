@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { certificateAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { FileBadge, PlusCircle, Search, Trash2, User, ArrowLeft } from 'lucide-react';
 
 export default function Certificates() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [certificates, setCertificates] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +36,11 @@ export default function Certificates() {
     setLoading(true);
     setError('');
     try {
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [certsRes, patientsRes] = await Promise.all([
-        certificateAPI.getCertificates(),
-        patientAPI.getPatients(),
+        certificateAPI.getCertificates({ ...clinicFilter, limit: 100 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
       ]);
 
       if (certsRes && certsRes.data) setCertificates(certsRes.data);
@@ -54,7 +58,7 @@ export default function Certificates() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   // Pre-fill content template based on type
   useEffect(() => {
@@ -103,8 +107,8 @@ export default function Certificates() {
 
     const payload = {
       patient_id: selectedPatientId,
-      doctor_id: user?._id || '6a55ce3df5878a83c6b4e275',
-      clinic_id: user?.clinic_id || '6a55ce3cf5878a83c6b4e274',
+      doctor_id: user?._id,
+      clinic_id: activeClinicId || user?.clinic_id?._id || user?.clinic_id,
       certificate_type: type,
       content,
       duration,

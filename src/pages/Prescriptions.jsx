@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { prescriptionAPI, patientAPI, medicineAPI, labAPI, templateAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import PdfPreviewModal from '../components/PdfPreviewModal';
 import { 
@@ -25,6 +26,7 @@ import {
 
 export default function Prescriptions() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [prescriptions, setPrescriptions] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,14 +103,14 @@ export default function Prescriptions() {
     setLoading(true);
     setError('');
     try {
-      const targetClinicId = user?.clinic_id?._id || user?.clinic_id;
-      const templateParams = targetClinicId ? { clinic_id: targetClinicId, limit: 100 } : { limit: 100 };
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [presRes, patientsRes, medsRes, labsRes, tempsRes, optsRes] = await Promise.allSettled([
-        prescriptionAPI.getPrescriptions(),
-        patientAPI.getPatients(),
+        prescriptionAPI.getPrescriptions({ ...clinicFilter, limit: 100 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
         medicineAPI.getMedicines({ limit: 100 }),
         labAPI.getLabs({ limit: 100 }),
-        templateAPI.getTemplates(templateParams),
+        templateAPI.getTemplates({ ...clinicFilter, limit: 100 }),
         medicineAPI.getMedicineOptions(),
       ]);
 
@@ -135,7 +137,7 @@ export default function Prescriptions() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   const handleOpenAdd = () => {
     setTemp('98.6');
@@ -261,8 +263,8 @@ export default function Prescriptions() {
 
     const payload = {
       patient_id: selectedPatientId,
-      doctor_id: user?._id || '6a55ce3df5878a83c6b4e275',
-      clinic_id: user?.clinic_id || '6a55ce3cf5878a83c6b4e274',
+      doctor_id: user?._id,
+      clinic_id: activeClinicId || user?.clinic_id?._id || user?.clinic_id,
       vitals: {
         temperature: temp,
         blood_pressure: bp,

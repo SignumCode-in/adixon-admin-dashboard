@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { labAPI, patientAPI, prescriptionAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { FlaskConical, PlusCircle, Search, Trash2, User, ArrowLeft } from 'lucide-react';
 
 export default function Labs() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [labs, setLabs] = useState([]);
   const [patients, setPatients] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
@@ -33,10 +35,12 @@ export default function Labs() {
     setLoading(true);
     setError('');
     try {
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [labsRes, patientsRes, presRes] = await Promise.all([
-        labAPI.getLabs(),
-        patientAPI.getPatients(),
-        prescriptionAPI.getPrescriptions(),
+        labAPI.getLabs({ ...clinicFilter, limit: 100 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
+        prescriptionAPI.getPrescriptions({ ...clinicFilter, limit: 100 }),
       ]);
 
       if (labsRes && labsRes.data) setLabs(labsRes.data);
@@ -58,7 +62,7 @@ export default function Labs() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   const handleOpenAdd = () => {
     setTestInput('CBC, Blood Sugar, Urine Routine');
@@ -98,11 +102,17 @@ export default function Labs() {
       return;
     }
 
+    if (!selectedPresId) {
+      setError('Please select a valid prescription for this lab order.');
+      return;
+    }
+
+    const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
     const payload = {
       patient_id: selectedPatientId,
-      doctor_id: user?._id || '6a55ce3df5878a83c6b4e275',
-      clinic_id: user?.clinic_id || '6a55ce3cf5878a83c6b4e274',
-      prescription_id: selectedPresId || '6a55ce3df5878a83c6b4e277',
+      doctor_id: user?._id,
+      clinic_id: targetClinicId,
+      prescription_id: selectedPresId,
       lab_test: testArray,
     };
 

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { appointmentAPI, patientAPI, userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { Calendar, PlusCircle, Search, Clock, User, ArrowLeft, Trash2, Edit2 } from 'lucide-react';
 
 export default function Appointments() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -37,10 +39,14 @@ export default function Appointments() {
     setLoading(true);
     setError('');
     try {
+      const queryParams = { limit: 100 };
+      if (activeClinicId && activeClinicId !== 'all') {
+        queryParams.clinic_id = activeClinicId;
+      }
       const [apptsRes, patientsRes, usersRes] = await Promise.all([
-        appointmentAPI.getAppointments(),
-        patientAPI.getPatients(),
-        userAPI.getUsers({ limit: 100 }),
+        appointmentAPI.getAppointments(queryParams),
+        patientAPI.getPatients(queryParams),
+        userAPI.getUsers(queryParams),
       ]);
 
       if (apptsRes && apptsRes.data) setAppointments(apptsRes.data);
@@ -63,7 +69,7 @@ export default function Appointments() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   const handleOpenAdd = () => {
     setIsEdit(false);

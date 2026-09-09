@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { templateAPI, medicineAPI, labAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   Layout, 
@@ -21,6 +22,7 @@ import {
 
 export default function Templates() {
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -71,8 +73,8 @@ export default function Templates() {
     setLoading(true);
     setError('');
     try {
-      const userClinicId = user?.clinic_id?._id || user?.clinic_id;
-      const params = userClinicId ? { clinic_id: userClinicId } : {};
+      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      const params = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [tempsRes, medsRes, labsRes, optsRes] = await Promise.allSettled([
         templateAPI.getTemplates(params),
         medicineAPI.getMedicines({ limit: 100 }),
@@ -98,7 +100,7 @@ export default function Templates() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeClinicId]);
 
   const handleOpenAdd = () => {
     setIsEdit(false);
@@ -222,12 +224,12 @@ export default function Templates() {
       return;
     }
 
-    const userClinicId = user?.clinic_id?._id || user?.clinic_id;
+    const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
     const payload = {
       name,
       type,
       doctor_id: user?._id,
-      clinic_id: userClinicId,
+      clinic_id: targetClinicId,
       content: ['Consents', 'Instructions', 'Certificates'].includes(type) ? content : null,
       duration: type === 'Certificates' ? duration : null,
       remarks: type === 'Certificates' ? remarks : null,

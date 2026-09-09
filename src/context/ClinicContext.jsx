@@ -24,7 +24,8 @@ export const ClinicProvider = ({ children }) => {
     setLoadingClinics(true);
     try {
       const res = await clinicAPI.getClinics({ limit: 100 });
-      setClinics(res.data.data || []);
+      const clinicList = Array.isArray(res?.data) ? res.data : (res?.data?.data || []);
+      setClinics(clinicList);
     } catch (err) {
       console.error('Failed to fetch clinics for clinic context selector:', err);
     } finally {

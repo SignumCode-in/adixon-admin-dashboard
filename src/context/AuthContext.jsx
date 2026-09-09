@@ -34,6 +34,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginUser = async (email, password) => {
+    return loginClinic(email, password);
+  };
+
+  const loginClinic = async (email, password) => {
     setLoading(true);
     try {
       // 1. Generate Firebase token via backend endpoint
@@ -52,9 +56,50 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('refresh_token', refreshToken);
       localStorage.setItem('user', JSON.stringify(userProfile));
 
-      return { success: true };
+      return { success: true, user: userProfile };
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Clinic login failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginAdmin = async (email, password) => {
+    setLoading(true);
+    try {
+      // 1. Generate Firebase token via backend endpoint
+      const tokenRes = await authAPI.generateToken(email, password);
+      const idToken = tokenRes.data.id_token;
+      const refreshToken = tokenRes.data.refresh_token;
+
+      // 2. Pass ID token to login route to load user from MongoDB
+      const loginRes = await authAPI.login(idToken);
+      const userProfile = loginRes.data.user;
+
+      // STRICT SECURITY CHECK: Reject non-admin credentials immediately without leaking role
+      if (!userProfile || userProfile.role !== 'admin') {
+        // Clear any residue and reject with generic message
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+        const err = new Error('Invalid credentials.');
+        err.isUnauthorized = true;
+        throw err;
+      }
+
+      // 3. Save to state & storage for verified admin
+      setToken(idToken);
+      setUser(userProfile);
+      localStorage.setItem('id_token', idToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      localStorage.setItem('user', JSON.stringify(userProfile));
+
+      return { success: true, user: userProfile };
+    } catch (error) {
+      console.error('Admin login failed:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -138,6 +183,8 @@ export const AuthProvider = ({ children }) => {
         theme,
         toggleTheme,
         login: loginUser,
+        loginClinic,
+        loginAdmin,
         loginWithGoogle,
         register: registerUser,
         logout: logoutUser,

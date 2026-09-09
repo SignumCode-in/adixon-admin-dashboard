@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { patientAPI, dashboardAPI, appointmentAPI, instructionAPI, consentAPI, prescriptionAPI, labAPI, certificateAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   User, 
@@ -15,24 +16,25 @@ import {
   FileText, 
   ClipboardCheck, 
   FlaskConical, 
-  Clipboard,
-  X,
-  ArrowLeft,
-  CheckCircle2,
-  ExternalLink
+  Clipboard, 
+  X, 
+  ArrowLeft, 
+  CheckCircle2, 
+  ExternalLink 
 } from 'lucide-react';
 
 export default function Patients() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const activeClinicId = useActiveClinicScope();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Search & Master Admin Clinic Filter
+  // Search & Clinic Filter State
   const [search, setSearch] = useState('');
-  const [filterClinicId, setFilterClinicId] = useState('all');
+  const [filterClinicId, setFilterClinicId] = useState(activeClinicId || 'all');
 
   // Page View Mode: 'list' | 'editor'
   const [viewMode, setViewMode] = useState('list');
@@ -168,8 +170,11 @@ export default function Patients() {
     setError('');
     try {
       const params = { limit: 200 };
-      if (user?.role === 'admin' && filterClinicId && filterClinicId !== 'all') {
-        params.clinic_id = filterClinicId;
+      const targetClinic = (activeClinicId && activeClinicId !== 'all') 
+        ? activeClinicId 
+        : (filterClinicId && filterClinicId !== 'all' ? filterClinicId : null);
+      if (targetClinic) {
+        params.clinic_id = targetClinic;
       }
       const res = await patientAPI.getPatients(params);
       if (res && res.data) {
@@ -183,15 +188,25 @@ export default function Patients() {
     }
   };
 
+  useEffect(() => {
+    loadPatients();
+  }, [activeClinicId, filterClinicId]);
+
   const loadPatientSubData = async (patientId) => {
     try {
+      const targetClinic = (activeClinicId && activeClinicId !== 'all') 
+        ? activeClinicId 
+        : (filterClinicId && filterClinicId !== 'all' ? filterClinicId : null);
+      const subParams = { patient_id: patientId, limit: 50 };
+      if (targetClinic) subParams.clinic_id = targetClinic;
+
       const [apptsRes, instRes, consentRes, presRes, labsRes, certRes] = await Promise.all([
-        appointmentAPI.getAppointments(),
-        instructionAPI.getInstructions(),
-        consentAPI.getConsents(),
-        prescriptionAPI.getPrescriptions(),
-        labAPI.getLabs(),
-        certificateAPI.getCertificates()
+        appointmentAPI.getAppointments(subParams),
+        instructionAPI.getInstructions(subParams),
+        consentAPI.getConsents(subParams),
+        prescriptionAPI.getPrescriptions(subParams),
+        labAPI.getLabs(subParams),
+        certificateAPI.getCertificates(subParams)
       ]);
 
       const filterById = (item) => {
