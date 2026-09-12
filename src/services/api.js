@@ -62,6 +62,10 @@ export const authAPI = {
 };
 
 export const userAPI = {
+  getMe: async () => {
+    const response = await apiClient.get('/users/me');
+    return response.data;
+  },
   getUsers: async (params = {}) => {
     const response = await apiClient.get('/users', { params });
     return response.data;
@@ -285,6 +289,21 @@ export const templateAPI = {
 export const dashboardAPI = {
   getMasterData: async (params = {}) => {
     const response = await apiClient.get('/dashboard/master', { params });
+    return response.data;
+  },
+};
+
+export const uploadAPI = {
+  uploadFile: async (formData) => {
+    const response = await apiClient.post('/files/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  deleteFile: async (data) => {
+    const response = await apiClient.delete('/files/delete', { data });
     return response.data;
   },
 };

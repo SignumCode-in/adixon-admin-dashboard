@@ -30,9 +30,16 @@ export default function PdfPreviewModal({
   const showStamp = clinic.is_stamp ?? clinic.showStampOnPdf ?? true;
   const showSignature = clinic.is_doctor_signature ?? clinic.showSignatureOnPdf ?? true;
 
-  const logoUrl = clinic.logo_url || clinic.logoUrl || '';
-  const signatureUrl = doctor.signature_url || clinic.doctor_signature_url || clinic.doctorSignatureUrl || '';
-  const stampUrl = clinic.stamp_url || clinic.stampUrl || '';
+  const resolveAsset = (asset) => {
+    if (!asset) return '';
+    if (typeof asset === 'string') return asset.trim();
+    if (typeof asset === 'object') return asset.secure_url || asset.url || '';
+    return '';
+  };
+
+  const logoUrl = clinic.logo_url || clinic.logoUrl || resolveAsset(clinic.logo) || resolveAsset(clinic.profile_url) || '';
+  const signatureUrl = doctor.signature_url || resolveAsset(doctor.signature) || resolveAsset(clinic.doctor_signature) || clinic.doctor_signature_url || clinic.doctorSignatureUrl || '';
+  const stampUrl = resolveAsset(clinic.stamp) || clinic.stamp_url || clinic.stampUrl || '';
 
   const doctorName = doctor.full_name || doctor.name || clinic.doctor_name || clinic.doctorName || 'Practitioner';
   const doctorQualification = doctor.qualification || clinic.doctor_qualification || clinic.doctorQualification || 'MBBS, MD';

@@ -11,16 +11,35 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
-  // Load user from localStorage on initialization
+  // Load user from localStorage and refresh from backend
   useEffect(() => {
-    const savedToken = localStorage.getItem('id_token');
-    const savedUser = localStorage.getItem('user');
+    const initAuth = async () => {
+      const savedToken = localStorage.getItem('id_token');
+      const savedUser = localStorage.getItem('user');
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+      if (savedToken && savedUser) {
+        setToken(savedToken);
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          console.error('Failed to parse cached user:', e);
+        }
+
+        // Fresh profile fetch from backend
+        try {
+          const res = await userAPI.getMe();
+          if (res && res.data) {
+            setUser(res.data);
+            localStorage.setItem('user', JSON.stringify(res.data));
+          }
+        } catch (err) {
+          console.warn('Could not refresh user profile on init:', err?.message);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   // Update theme in DOM & localStorage
@@ -170,6 +189,20 @@ export const AuthProvider = ({ children }) => {
     return false;
   };
 
+  const refreshUserProfile = async () => {
+    try {
+      const res = await userAPI.getMe();
+      if (res && res.data) {
+        setUser(res.data);
+        localStorage.setItem('user', JSON.stringify(res.data));
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('Failed to refresh user profile:', err);
+    }
+    return null;
+  };
+
   const isAdmin = user?.role === 'admin';
   const isDoctor = user?.role === 'doctor';
   const isStaff = user?.role === 'staff';
@@ -189,6 +222,7 @@ export const AuthProvider = ({ children }) => {
         register: registerUser,
         logout: logoutUser,
         setUser,
+        refreshUserProfile,
         hasPermission,
         isAdmin,
         isDoctor,
