@@ -109,6 +109,14 @@ export const clinicAPI = {
     const response = await apiClient.put(`/clinics/${id}`, clinicData);
     return response.data;
   },
+  getPdfTemplate: async (id) => {
+    const response = await apiClient.get(`/clinics/${id}/pdf-template`);
+    return response.data;
+  },
+  updatePdfTemplate: async (id, data) => {
+    const response = await apiClient.put(`/clinics/${id}/pdf-template`, data);
+    return response.data;
+  },
 };
 
 export const patientAPI = {
@@ -157,6 +165,15 @@ export const prescriptionAPI = {
   createPrescription: async (prescriptionData) => {
     const response = await apiClient.post('/prescriptions', prescriptionData);
     return response.data;
+  },
+  getPdfBlob: async (id) => {
+    const response = await apiClient.get(`/prescriptions/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  getPdfUrl: (id) => {
+    return `${API_BASE_URL}/prescriptions/${id}/pdf`;
   },
 };
 
@@ -231,6 +248,16 @@ export const certificateAPI = {
     const response = await apiClient.delete(`/certificates/${id}`);
     return response.data;
   },
+  getPdfBlob: async (id, params = {}) => {
+    const response = await apiClient.get(`/certificates/${id}/pdf`, {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  getPdfUrl: (id) => {
+    return `${API_BASE_URL}/certificates/${id}/pdf`;
+  },
 };
 
 export const instructionAPI = {
@@ -264,6 +291,16 @@ export const consentAPI = {
   deleteConsent: async (id) => {
     const response = await apiClient.delete(`/consents/${id}`);
     return response.data;
+  },
+  getPdfBlob: async (id, params = {}) => {
+    const response = await apiClient.get(`/consents/${id}/pdf`, {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  getPdfUrl: (id) => {
+    return `${API_BASE_URL}/consents/${id}/pdf`;
   },
 };
 

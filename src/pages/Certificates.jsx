@@ -3,7 +3,8 @@ import { certificateAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { FileBadge, PlusCircle, Search, Trash2, User, ArrowLeft } from 'lucide-react';
+import PdfPreviewModal from '../components/PdfPreviewModal';
+import { FileBadge, PlusCircle, Search, Trash2, User, ArrowLeft, Printer } from 'lucide-react';
 
 export default function Certificates() {
   const { user } = useAuth();
@@ -24,6 +25,10 @@ export default function Certificates() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // PDF Preview Modal State
+  const [previewCert, setPreviewCert] = useState(null);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   // Form Fields
   const [selectedPatientId, setSelectedPatientId] = useState('');
@@ -303,7 +308,18 @@ export default function Certificates() {
                   </td>
                   <td>{c.doctor_id?.full_name || 'Clinic Doctor'}</td>
                   <td>{new Date(c.createdAt).toLocaleDateString()}</td>
-                  <td>
+                  <td style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      title="View / Print PDF"
+                      onClick={() => {
+                        setPreviewCert(c);
+                        setPdfModalOpen(true);
+                      }}
+                    >
+                      <Printer size={13} /> PDF
+                    </button>
                     <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)}>
                       <Trash2 size={14} />
                     </button>
@@ -327,6 +343,22 @@ export default function Certificates() {
         message="Are you sure you want to delete/revoke this medical certificate record?"
         loading={deleteLoading}
       />
+
+      {/* PDF PREVIEW MODAL */}
+      {pdfModalOpen && previewCert && (
+        <PdfPreviewModal
+          isOpen={pdfModalOpen}
+          onClose={() => {
+            setPdfModalOpen(false);
+            setPreviewCert(null);
+          }}
+          type="certificate"
+          data={previewCert}
+          patient={previewCert.patient_id || {}}
+          clinic={previewCert.clinic_id || user?.clinic_id || {}}
+          doctor={previewCert.doctor_id || user || {}}
+        />
+      )}
     </div>
   );
 }

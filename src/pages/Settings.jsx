@@ -39,13 +39,15 @@ import {
   Award,
   Info
 } from 'lucide-react';
+import PdfTemplateStudio from '../components/PdfTemplateStudio';
 
 export default function Settings() {
   const { user, refreshUserProfile } = useAuth();
   const activeClinicId = useActiveClinicScope();
   
-  // Tabs: 'clinic' | 'profile' | 'security' | 'medicine_presets'
+  // Tabs: 'clinic' | 'pdf_template' | 'profile' | 'security' | 'medicine_presets'
   const [activeTab, setActiveTab] = useState('clinic');
+  const [rawClinic, setRawClinic] = useState(null);
   
   // UI states
   const [loading, setLoading] = useState(false);
@@ -387,6 +389,7 @@ export default function Settings() {
       }
 
       if (targetClinic) {
+        setRawClinic(targetClinic);
         setClinicId(targetClinic._id);
         setClinicName(targetClinic.name || '');
         setClinicTagline(targetClinic.tagline || '');
@@ -803,6 +806,28 @@ export default function Settings() {
           </div>
 
           <div
+            className={`settings-nav-item ${activeTab === 'pdf_template' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('pdf_template');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            style={{ 
+              padding: '12px 16px', 
+              borderRadius: '10px', 
+              cursor: 'pointer',
+              fontWeight: activeTab === 'pdf_template' ? '600' : '500',
+              backgroundColor: activeTab === 'pdf_template' ? 'var(--color-primary-light)' : 'transparent',
+              color: activeTab === 'pdf_template' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+              <FileText size={18} /> PDF Template Studio
+            </span>
+          </div>
+
+          <div
             className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('profile');
@@ -888,6 +913,28 @@ export default function Settings() {
             </div>
           ) : (
             <>
+              {/* TAB: PDF TEMPLATE STUDIO */}
+              {activeTab === 'pdf_template' && (
+                <PdfTemplateStudio 
+                  clinic={rawClinic || { 
+                    _id: clinicId, 
+                    id: clinicId, 
+                    name: clinicName, 
+                    phone: clinicPhone, 
+                    email: clinicEmail, 
+                    doctor_name: docName, 
+                    doctor_qualification: docQualification, 
+                    registration_number: docRegNumber,
+                    logo: clinicLogo, 
+                    stamp: clinicStamp, 
+                    doctor_signature: doctorSignature 
+                  }}
+                  onSaveSuccess={() => {
+                    setSuccessMsg('PDF prescription template updated successfully!');
+                  }}
+                />
+              )}
+
               {/* TAB 1: CLINIC PRACTICE & BRANDING */}
               {activeTab === 'clinic' && (
                 <div>

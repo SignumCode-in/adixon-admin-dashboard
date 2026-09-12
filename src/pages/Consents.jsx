@@ -3,7 +3,8 @@ import { consentAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { ClipboardCheck, PlusCircle, Search, Trash2, User, ArrowLeft } from 'lucide-react';
+import PdfPreviewModal from '../components/PdfPreviewModal';
+import { ClipboardCheck, PlusCircle, Search, Trash2, User, ArrowLeft, Printer } from 'lucide-react';
 
 export default function Consents() {
   const { user } = useAuth();
@@ -24,6 +25,10 @@ export default function Consents() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // PDF Preview Modal State
+  const [previewConsent, setPreviewConsent] = useState(null);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   // Form Fields
   const [selectedPatientId, setSelectedPatientId] = useState('');
@@ -294,8 +299,18 @@ export default function Consents() {
                   </td>
                   <td style={{ fontStyle: 'italic', fontFamily: 'cursive' }}>{c.patient_signature || 'Not Signed'}</td>
                   <td>{c.doctor_signature || 'N/A'}</td>
-                  <td>{new Date(c.createdAt).toLocaleDateString()}</td>
-                  <td>
+                  <td style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      title="View / Print PDF"
+                      onClick={() => {
+                        setPreviewConsent(c);
+                        setPdfModalOpen(true);
+                      }}
+                    >
+                      <Printer size={13} /> PDF
+                    </button>
                     <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)}>
                       <Trash2 size={14} />
                     </button>
@@ -319,6 +334,22 @@ export default function Consents() {
         message="Are you sure you want to delete this patient consent record?"
         loading={deleteLoading}
       />
+
+      {/* PDF PREVIEW MODAL */}
+      {pdfModalOpen && previewConsent && (
+        <PdfPreviewModal
+          isOpen={pdfModalOpen}
+          onClose={() => {
+            setPdfModalOpen(false);
+            setPreviewConsent(null);
+          }}
+          type="consent"
+          data={previewConsent}
+          patient={previewConsent.patient_id || {}}
+          clinic={previewConsent.clinic_id || user?.clinic_id || {}}
+          doctor={previewConsent.doctor_id || user || {}}
+        />
+      )}
     </div>
   );
 }
