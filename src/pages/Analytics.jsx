@@ -12,7 +12,7 @@ import {
   Legend 
 } from 'chart.js';
 import { Users, Calendar, FileSpreadsheet, Hospital, Activity, RefreshCw } from 'lucide-react';
-import { patientAPI, appointmentAPI, prescriptionAPI, clinicAPI, userAPI } from '../services/api';
+import { dashboardAPI, patientAPI, appointmentAPI, prescriptionAPI, clinicAPI, userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useClinic } from '../context/ClinicContext';
 
@@ -44,9 +44,10 @@ export default function Analytics() {
   });
 
   const [monthlyData, setMonthlyData] = useState({
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
-    patientsTrend: [0, 0, 0, 0, 0, 0, 0, 0],
-    apptsTrend: [0, 0, 0, 0, 0, 0, 0, 0],
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    patientsTrend: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    apptsTrend: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    prescTrend: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   });
 
   useEffect(() => {
@@ -58,10 +59,41 @@ export default function Analytics() {
     try {
       const scopeParams = selectedClinicId && selectedClinicId !== 'all' ? { clinic_id: selectedClinicId } : {};
 
+      // 1. First attempt dedicated backend analytics aggregation endpoint
+      try {
+        const analyticsRes = await dashboardAPI.getAnalytics(scopeParams);
+        if (analyticsRes && analyticsRes.success && analyticsRes.data) {
+          const { summary, monthly_trends } = analyticsRes.data;
+          setMetrics({
+            patientsCount: summary.total_patients || 0,
+            appointmentsCount: summary.total_appointments || 0,
+            prescriptionsCount: summary.total_prescriptions || 0,
+            clinicsCount: summary.total_clinics || 0,
+            usersCount: summary.total_users || 0,
+            scheduledAppts: summary.scheduled_appointments || 0,
+            completedAppts: summary.completed_appointments || 0,
+          });
+
+          if (monthly_trends) {
+            setMonthlyData({
+              labels: monthly_trends.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              patientsTrend: monthly_trends.patients || new Array(12).fill(0),
+              apptsTrend: monthly_trends.appointments || new Array(12).fill(0),
+              prescTrend: monthly_trends.prescriptions || new Array(12).fill(0),
+            });
+          }
+          setLoading(false);
+          return;
+        }
+      } catch (analyticsErr) {
+        console.warn('Dedicated analytics endpoint fallback to individual collection counts:', analyticsErr);
+      }
+
+      // 2. Fallback to individual live API queries with full pagination metadata
       const promises = [
-        patientAPI.getPatients(scopeParams),
-        appointmentAPI.getAppointments(scopeParams),
-        prescriptionAPI.getPrescriptions(scopeParams),
+        patientAPI.getPatients({ ...scopeParams, limit: 100 }),
+        appointmentAPI.getAppointments({ ...scopeParams, limit: 100 }),
+        prescriptionAPI.getPrescriptions({ ...scopeParams, limit: 100 }),
       ];
 
       if (isAdmin) {
@@ -86,16 +118,17 @@ export default function Analytics() {
       const scheduledCount = Array.isArray(apptsList) ? apptsList.filter(a => a.status === 'scheduled').length : 0;
       const completedCount = Array.isArray(apptsList) ? apptsList.filter(a => a.status === 'completed').length : 0;
 
-      // Group monthly registrations
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
-      const pCounts = new Array(8).fill(0);
-      const aCounts = new Array(8).fill(0);
+      // Group monthly registrations across all 12 months using real timestamps
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pCounts = new Array(12).fill(0);
+      const aCounts = new Array(12).fill(0);
+      const prCounts = new Array(12).fill(0);
 
       if (Array.isArray(patientsList)) {
         patientsList.forEach(p => {
           if (p.createdAt) {
             const m = new Date(p.createdAt).getMonth();
-            if (m < 8) pCounts[m]++;
+            if (m >= 0 && m < 12) pCounts[m]++;
           }
         });
       }
@@ -104,25 +137,35 @@ export default function Analytics() {
         apptsList.forEach(a => {
           if (a.createdAt || a.date) {
             const m = new Date(a.createdAt || a.date).getMonth();
-            if (m < 8) aCounts[m]++;
+            if (m >= 0 && m < 12) aCounts[m]++;
+          }
+        });
+      }
+
+      if (Array.isArray(prescList)) {
+        prescList.forEach(pr => {
+          if (pr.createdAt) {
+            const m = new Date(pr.createdAt).getMonth();
+            if (m >= 0 && m < 12) prCounts[m]++;
           }
         });
       }
 
       setMetrics({
-        patientsCount: patientsRes?.data?.pagination?.total_records || patientsList.length,
-        appointmentsCount: apptsRes?.data?.pagination?.total_records || apptsList.length,
-        prescriptionsCount: prescRes?.data?.pagination?.total_records || prescList.length,
-        clinicsCount: clinicsRes?.data?.pagination?.total_records || clinicsList.length,
-        usersCount: usersRes?.data?.pagination?.total_records || usersList.length,
+        patientsCount: patientsRes?.pagination?.total_records ?? patientsRes?.data?.pagination?.total_records ?? patientsRes?.count ?? patientsList.length,
+        appointmentsCount: apptsRes?.pagination?.total_records ?? apptsRes?.data?.pagination?.total_records ?? apptsRes?.count ?? apptsList.length,
+        prescriptionsCount: prescRes?.pagination?.total_records ?? prescRes?.data?.pagination?.total_records ?? prescRes?.count ?? prescList.length,
+        clinicsCount: clinicsRes?.pagination?.total_records ?? clinicsRes?.data?.pagination?.total_records ?? clinicsRes?.count ?? clinicsList.length,
+        usersCount: usersRes?.pagination?.total_records ?? usersRes?.data?.pagination?.total_records ?? usersRes?.count ?? usersList.length,
         scheduledAppts: scheduledCount,
         completedAppts: completedCount,
       });
 
       setMonthlyData({
         labels: months,
-        patientsTrend: pCounts.some(c => c > 0) ? pCounts : [2, 5, 8, 12, 18, 25, 31, patientsList.length || 35],
-        apptsTrend: aCounts.some(c => c > 0) ? aCounts : [5, 10, 14, 22, 30, 42, 55, apptsList.length || 60],
+        patientsTrend: pCounts,
+        apptsTrend: aCounts,
+        prescTrend: prCounts,
       });
     } catch (err) {
       console.error('Error loading analytics data:', err);
@@ -147,6 +190,14 @@ export default function Analytics() {
         data: monthlyData.apptsTrend,
         borderColor: '#1D9E75',
         backgroundColor: 'rgba(29, 158, 117, 0.15)',
+        tension: 0.4,
+        fill: true,
+      },
+      {
+        label: 'Prescriptions Issued',
+        data: monthlyData.prescTrend,
+        borderColor: '#a855f7',
+        backgroundColor: 'rgba(168, 85, 247, 0.15)',
         tension: 0.4,
         fill: true,
       }

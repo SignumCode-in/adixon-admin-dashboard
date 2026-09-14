@@ -21,12 +21,16 @@ import {
   ChevronRight,
   Edit2,
   X,
-  Printer
+  Printer,
+  Calendar,
+  Activity
 } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
 
 export default function Prescriptions() {
   const { user } = useAuth();
   const activeClinicId = useActiveClinicScope();
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_prescriptions') || 'list');
   const [prescriptions, setPrescriptions] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,11 +110,11 @@ export default function Prescriptions() {
       const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
       const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [presRes, patientsRes, medsRes, labsRes, tempsRes, optsRes] = await Promise.allSettled([
-        prescriptionAPI.getPrescriptions({ ...clinicFilter, limit: 100 }),
-        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
-        medicineAPI.getMedicines({ limit: 100 }),
-        labAPI.getLabs({ limit: 100 }),
-        templateAPI.getTemplates({ ...clinicFilter, limit: 100 }),
+        prescriptionAPI.getPrescriptions({ ...clinicFilter, limit: 2000 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 2000 }),
+        medicineAPI.getMedicines({ limit: 1000 }),
+        labAPI.getLabs({ limit: 500 }),
+        templateAPI.getTemplates({ ...clinicFilter, limit: 500 }),
         medicineAPI.getMedicineOptions(),
       ]);
 
@@ -927,8 +931,8 @@ export default function Prescriptions() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
             className="input-field"
@@ -939,14 +943,96 @@ export default function Prescriptions() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle 
+          mode={displayMode} 
+          onChange={(m) => {
+            setDisplayMode(m);
+            localStorage.setItem('adixon_view_mode_prescriptions', m);
+          }} 
+        />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading prescriptions...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No prescriptions created.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading prescriptions...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No prescriptions created.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((pr) => (
+            <div key={pr._id} className="record-card">
+              <div className="record-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--color-info-light)', color: 'var(--color-info)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    <FileSpreadsheet size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {pr.patient_id?.full_name || 'Patient'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={11} /> {new Date(pr.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                <span className="badge badge-info" style={{ fontSize: '11px', fontWeight: '600' }}>
+                  {pr.clinical?.diagnosis || pr.diagnosis || 'General Rx'}
+                </span>
+              </div>
+
+              <div className="record-card-body">
+                {pr.clinical?.chief_complaint && (
+                  <div className="record-card-row">
+                    <span>Complaint: <strong>{pr.clinical.chief_complaint}</strong></span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <span className="badge badge-primary" style={{ fontSize: '11px' }}>
+                    <Pill size={11} style={{ marginRight: '4px' }} />
+                    {pr.medicines?.length || 0} Medicines
+                  </span>
+                  {pr.labs?.length > 0 && (
+                    <span className="badge badge-success" style={{ fontSize: '11px' }}>
+                      <FlaskConical size={11} style={{ marginRight: '4px' }} />
+                      {pr.labs.length} Labs
+                    </span>
+                  )}
+                </div>
+                {pr.vitals && (pr.vitals.blood_pressure || pr.vitals.pulse_rate || pr.vitals.temperature) && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', background: 'var(--color-bg-secondary)', padding: '6px 8px', borderRadius: '6px', marginTop: '4px' }}>
+                    <Activity size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                    {[
+                      pr.vitals.blood_pressure ? `${pr.vitals.blood_pressure} BP` : null,
+                      pr.vitals.pulse_rate ? `${pr.vitals.pulse_rate} bpm` : null,
+                      pr.vitals.temperature ? `${pr.vitals.temperature} °F` : null,
+                    ].filter(Boolean).join(' • ')}
+                  </div>
+                )}
+              </div>
+
+              <div className="record-card-footer">
+                <button 
+                  className="btn btn-primary" 
+                  style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                  onClick={() => {
+                    setPreviewPrescription(pr);
+                    setPdfModalOpen(true);
+                  }}
+                >
+                  <Printer size={12} /> PDF Preview
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} 
+                  onClick={() => triggerDelete(pr._id)}
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -1005,8 +1091,8 @@ export default function Prescriptions() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       <ConfirmDeleteModal
         isOpen={deleteModalOpen}

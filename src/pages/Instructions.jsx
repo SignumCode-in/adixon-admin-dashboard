@@ -3,12 +3,14 @@ import { instructionAPI, patientAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { FileText, PlusCircle, Search, Trash2, Edit2, User, ArrowLeft } from 'lucide-react';
+import { FileText, PlusCircle, Search, Trash2, Edit2, User, ArrowLeft, Stethoscope, Calendar } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
 
 export default function Instructions() {
   const { user } = useAuth();
   const activeClinicId = useActiveClinicScope();
   const [instructions, setInstructions] = useState([]);
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_instructions') || 'list');
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,8 +41,8 @@ export default function Instructions() {
       const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
       const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [instrRes, patientsRes] = await Promise.all([
-        instructionAPI.getInstructions({ ...clinicFilter, limit: 100 }),
-        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
+        instructionAPI.getInstructions({ ...clinicFilter, limit: 1000 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 1000 }),
       ]);
 
       if (instrRes && instrRes.data) setInstructions(instrRes.data);
@@ -231,8 +233,8 @@ export default function Instructions() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
             className="input-field"
@@ -243,14 +245,67 @@ export default function Instructions() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle 
+          mode={displayMode} 
+          onChange={(m) => {
+            setDisplayMode(m);
+            localStorage.setItem('adixon_view_mode_instructions', m);
+          }} 
+        />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading instructions catalogue...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient instructions logged.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading instructions catalogue...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient instructions logged.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((inst) => (
+            <div key={inst._id} className="record-card">
+              <div className="record-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {inst.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                      Patient: {inst.patient_id?.full_name || 'Walk-in'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="record-card-body">
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', padding: '8px 10px', borderRadius: '6px', lineHeight: 1.4, maxHeight: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {inst.description || 'No description provided.'}
+                </div>
+                <div className="record-card-row" style={{ marginTop: '6px' }}>
+                  <Stethoscope size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                  <span>Doctor: {inst.doctor_id?.full_name || 'Clinic Doctor'}</span>
+                </div>
+              </div>
+
+              <div className="record-card-footer">
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                  ID: {inst._id.slice(-6)}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px' }} onClick={() => handleOpenEdit(inst)}>
+                    <Edit2 size={12} /> Edit
+                  </button>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} onClick={() => triggerDelete(inst._id)}>
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -278,7 +333,7 @@ export default function Instructions() {
                       <button className="icon-btn" onClick={() => handleOpenEdit(inst)} title="Edit guide">
                         <Edit2 size={14} />
                       </button>
-                      <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(inst._id)}>
+                      <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(inst._id)} title="Delete guide">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -287,8 +342,8 @@ export default function Instructions() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal

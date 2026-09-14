@@ -9,12 +9,16 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor to attach Authorization Bearer token
+// Interceptor to attach Authorization Bearer token & Session ID
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('id_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const sessionId = localStorage.getItem('session_id');
+    if (sessionId) {
+      config.headers['x-session-id'] = sessionId;
     }
     return config;
   },
@@ -28,11 +32,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clear token if unauthenticated
-      const isAuthRoute = error.config.url.includes('/auth/login') || error.config.url.includes('/auth/generate-token');
+      // Clear tokens if unauthenticated or session terminated
+      const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/generate-token');
       if (!isAuthRoute) {
         localStorage.removeItem('id_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('session_id');
         localStorage.removeItem('user');
         const isAdminPath = window.location.pathname.startsWith('/admin');
         window.location.href = isAdminPath ? '/admin/login' : '/login';
@@ -90,6 +95,10 @@ export const userAPI = {
     const response = await apiClient.patch(`/users/${id}/status`, { status });
     return response.data;
   },
+  changePassword: async (id, password) => {
+    const response = await apiClient.patch(`/users/${id}/password`, { password });
+    return response.data;
+  },
 };
 
 export const clinicAPI = {
@@ -115,6 +124,10 @@ export const clinicAPI = {
   },
   updatePdfTemplate: async (id, data) => {
     const response = await apiClient.put(`/clinics/${id}/pdf-template`, data);
+    return response.data;
+  },
+  updateClinicAdminSettings: async (id, admin_settings) => {
+    const response = await apiClient.patch(`/clinics/${id}/admin-settings`, { admin_settings });
     return response.data;
   },
 };
@@ -328,6 +341,14 @@ export const dashboardAPI = {
     const response = await apiClient.get('/dashboard/master', { params });
     return response.data;
   },
+  getAnalytics: async (params = {}) => {
+    const response = await apiClient.get('/dashboard/analytics', { params });
+    return response.data;
+  },
+  globalSearch: async (params = {}) => {
+    const response = await apiClient.get('/dashboard/search', { params });
+    return response.data;
+  },
 };
 
 export const uploadAPI = {
@@ -345,4 +366,65 @@ export const uploadAPI = {
   },
 };
 
+export const auditAPI = {
+  getLogs: async (params = {}) => {
+    const response = await apiClient.get('/audit-logs', { params });
+    return response.data;
+  },
+  getLogById: async (id) => {
+    const response = await apiClient.get(`/audit-logs/${id}`);
+    return response.data;
+  },
+};
+
+export const storageAPI = {
+  getPlatformStorage: async () => {
+    const response = await apiClient.get('/storage/platform');
+    return response.data;
+  },
+  getClinicStorage: async (clinicId) => {
+    const response = await apiClient.get(`/storage/clinic/${clinicId}`);
+    return response.data;
+  },
+};
+
+export const firewallAPI = {
+  getLiveTraffic: async () => {
+    const response = await apiClient.get('/firewall/traffic');
+    return response.data;
+  },
+  getFirewallRules: async () => {
+    const response = await apiClient.get('/firewall/rules');
+    return response.data;
+  },
+  blockIp: async (data) => {
+    const response = await apiClient.post('/firewall/block', data);
+    return response.data;
+  },
+  unblockIp: async (id) => {
+    const response = await apiClient.delete(`/firewall/unblock/${id}`);
+    return response.data;
+  },
+};
+
+export const sessionAPI = {
+  getSessions: async (params = {}) => {
+    const response = await apiClient.get('/sessions', { params });
+    return response.data;
+  },
+  terminateSession: async (id, reason) => {
+    const response = await apiClient.post(`/sessions/${id}/terminate`, { reason });
+    return response.data;
+  },
+  terminateUserSessions: async (userId, reason) => {
+    const response = await apiClient.post(`/sessions/terminate-user/${userId}`, { reason });
+    return response.data;
+  },
+  terminateClinicSessions: async (clinicId, reason) => {
+    const response = await apiClient.post(`/sessions/terminate-clinic/${clinicId}`, { reason });
+    return response.data;
+  },
+};
+
 export default apiClient;
+

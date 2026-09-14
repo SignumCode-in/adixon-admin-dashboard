@@ -37,17 +37,60 @@ import {
   Phone,
   Calendar,
   Award,
-  Info
+  Info,
+  HardDrive,
+  Eye,
+  EyeOff,
+  Layers,
+  Activity,
+  Sliders,
+  CheckSquare,
+  Square,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import PdfTemplateStudio from '../components/PdfTemplateStudio';
 
+const ALL_CLINIC_MODULES = [
+  { key: 'dashboard', label: 'Clinical Dashboard & Daily Stats', group: 'Clinical Care', icon: <Layout size={16} />, desc: 'OPD queue counter, daily consultations, and clinical overview' },
+  { key: 'patients', label: 'Patients Directory & Health Records (EHR)', group: 'Clinical Care', icon: <UserCheck size={16} />, desc: 'Patient profiles, medical history, vitals, and visit timelines' },
+  { key: 'appointments', label: 'Appointments & OPD Scheduling', group: 'Clinical Care', icon: <CalendarDays size={16} />, desc: 'Calendar scheduling, time slots, and doctor waiting queue' },
+  { key: 'prescriptions', label: 'Digital Prescriptions (Rx)', group: 'Clinical Care', icon: <FileSpreadsheet size={16} />, desc: 'Electronic prescription generator, dosage guidelines, and Rx history' },
+  { key: 'medicines', label: 'Medicines Catalog & Pharmacy Stock', group: 'Medical Assets', icon: <Pill size={16} />, desc: 'Pharmaceutical drugs formulary and dispensary stock inventory' },
+  { key: 'certificates', label: 'Medical & Fitness Certificates', group: 'Medical Assets', icon: <FileBadge size={16} />, desc: 'Medical leave certificates, fitness endorsements, and reports' },
+  { key: 'instructions', label: 'Patient Instructions & Care Advice', group: 'Medical Assets', icon: <FileText size={16} />, desc: 'Personalized dietary recommendations and discharge advice sheets' },
+  { key: 'consents', label: 'Clinical Consent Forms', group: 'Medical Assets', icon: <ClipboardCheck size={16} />, desc: 'Digital procedure consent forms and informed patient signatures' },
+  { key: 'templates', label: 'Clinical & Rx Templates', group: 'Medical Assets', icon: <Layout size={16} />, desc: 'Standardized chief complaint presets, diagnosis, and Rx templates' },
+  { key: 'staff_management', label: 'Clinic Staff & Team Directory', group: 'Practice Governance', icon: <UsersIcon size={16} />, desc: 'Manage clinic assistants, receptionists, and user profiles' },
+  { key: 'clinic_settings', label: 'Clinic Settings & Letterhead Branding', group: 'Practice Governance', icon: <Building size={16} />, desc: 'Letterhead branding, visit hours, headers, and stamps' },
+  { key: 'reports_analytics', label: 'Operational Analytics & Reports', group: 'Practice Governance', icon: <Activity size={16} />, desc: 'Throughput statistics, physician caseload, and operational reports' },
+  { key: 'billing_invoices', label: 'Billing, Receipts & Invoicing', group: 'Practice Governance', icon: <FileSpreadsheet size={16} />, desc: 'Consultation fees, digital payment receipts, and billing history' },
+  { key: 'storage_footprint', label: 'Cloud Storage & Quota Footprint', group: 'System & Quota', icon: <HardDrive size={16} />, desc: 'Clinic file uploads, generated prescription PDFs, and media quota' },
+];
+
 export default function Settings() {
   const { user, refreshUserProfile } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const activeClinicId = useActiveClinicScope();
   
-  // Tabs: 'clinic' | 'pdf_template' | 'profile' | 'security' | 'medicine_presets'
-  const [activeTab, setActiveTab] = useState('clinic');
+  const isViewingOtherClinic = Boolean(activeClinicId);
+  const canManageClinicSettings = !isAdmin || isViewingOtherClinic;
+
+  // Tabs: 'clinic' | 'pdf_template' | 'profile' | 'security' | 'medicine_presets' | 'admin_governance'
+  const [activeTab, setActiveTab] = useState(() => (isViewingOtherClinic ? 'clinic' : (isAdmin ? 'profile' : 'clinic')));
   const [rawClinic, setRawClinic] = useState(null);
+
+  useEffect(() => {
+    if (isViewingOtherClinic) {
+      if (activeTab !== 'clinic' && activeTab !== 'pdf_template' && activeTab !== 'admin_governance') {
+        setActiveTab('clinic');
+      }
+    } else if (isAdmin) {
+      if (activeTab === 'clinic' || activeTab === 'pdf_template' || activeTab === 'admin_governance') {
+        setActiveTab('profile');
+      }
+    }
+  }, [isViewingOtherClinic, isAdmin, activeTab]);
   
   // UI states
   const [loading, setLoading] = useState(false);
@@ -105,6 +148,54 @@ export default function Settings() {
   const [newFreqInput, setNewFreqInput] = useState('');
   const [newInstructionInput, setNewInstructionInput] = useState('');
 
+  // Administration & Governance Form States (Master Admin managing individual clinic)
+  const [adminStatus, setAdminStatus] = useState('active');
+  const [suspensionReason, setSuspensionReason] = useState('');
+  const [enabledModules, setEnabledModules] = useState({
+    dashboard: true,
+    patients: true,
+    appointments: true,
+    prescriptions: true,
+    medicines: true,
+    certificates: true,
+    instructions: true,
+    consents: true,
+    templates: true,
+    staff_management: true,
+    clinic_settings: true,
+    reports_analytics: true,
+    billing_invoices: true,
+    storage_footprint: true,
+  });
+  const [staffSectionAccess, setStaffSectionAccess] = useState({
+    dashboard: true,
+    patients: true,
+    appointments: true,
+    prescriptions: false,
+    medicines: true,
+    certificates: false,
+    instructions: true,
+    consents: true,
+    templates: false,
+    staff_management: false,
+    clinic_settings: false,
+    reports_analytics: false,
+    billing_invoices: true,
+    storage_footprint: false,
+  });
+  const [allowStaffPasswordChange, setAllowStaffPasswordChange] = useState(true);
+  const [allowStaffPatientRegistration, setAllowStaffPatientRegistration] = useState(true);
+  const [allowStaffDataExport, setAllowStaffDataExport] = useState(false);
+  const [allowDoctorDeleteRecords, setAllowDoctorDeleteRecords] = useState(true);
+  const [requirePatientPhone, setRequirePatientPhone] = useState(true);
+  const [requirePrescriptionDiagnosis, setRequirePrescriptionDiagnosis] = useState(false);
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(60);
+  const [enforceStrongPasswords, setEnforceStrongPasswords] = useState(true);
+  const [storageLimitMb, setStorageLimitMb] = useState(500);
+  const [storageWarningThreshold, setStorageWarningThreshold] = useState(80);
+  const [maxDailyAppointmentsPerDoctor, setMaxDailyAppointmentsPerDoctor] = useState(50);
+  const [savingAdminSettings, setSavingAdminSettings] = useState(false);
+
   // Interactive Digital Signature Canvas State
   const [showSignCanvas, setShowSignCanvas] = useState(false);
   const canvasRef = useRef(null);
@@ -113,7 +204,6 @@ export default function Settings() {
 
   // Role checks
   const isStaff = user?.role === 'staff';
-  const isAdmin = user?.role === 'admin';
   const isPrimaryDoctor = user?.is_primary || (primaryDoctor && user?._id === primaryDoctor._id);
   const canEditPrimaryDoc = isAdmin || isPrimaryDoctor;
 
@@ -156,12 +246,6 @@ export default function Settings() {
           title: 'Medicines & Dispensary Inventory',
           description: 'Browse pharmaceutical formulary, dosage recommendations, and manage clinic dispensary stock.',
           icon: <Pill size={16} />
-        },
-        {
-          key: 'labs',
-          title: 'Labs & Diagnostics',
-          description: 'Order lab investigations, radiology tests, and record diagnostic pathology results.',
-          icon: <FlaskConical size={16} />
         },
         {
           key: 'certificates',
@@ -366,63 +450,86 @@ export default function Settings() {
       await loadMedicineOptions();
 
       // Resolve targeted clinic:
-      const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+      // Active clinic scope (admin managing another clinic) OR doctor/staff own clinic
+      const targetClinicId = activeClinicId || (!isAdmin ? (user?.clinic_id?._id || user?.clinic_id) : null);
       
-      let targetClinic = null;
       if (targetClinicId) {
+        let targetClinic = null;
         try {
           const singleRes = await clinicAPI.getClinicById(targetClinicId);
           if (singleRes && singleRes.data) {
-            targetClinic = singleRes.data;
+            targetClinic = singleRes.data?.data || singleRes.data;
           }
         } catch (e) {
           console.warn('Direct clinic fetch fallback to list:', e);
         }
-      }
 
-      if (!targetClinic) {
-        const res = await clinicAPI.getClinics();
-        const clinicList = Array.isArray(res?.data) ? res.data : (res?.data?.data || []);
-        if (clinicList.length > 0) {
-          targetClinic = clinicList.find(c => c._id === targetClinicId) || clinicList[0];
+        if (!targetClinic && !isAdmin) {
+          const res = await clinicAPI.getClinics();
+          const clinicList = Array.isArray(res?.data) ? res.data : (res?.data?.data || []);
+          if (clinicList.length > 0) {
+            targetClinic = clinicList.find(c => c._id === targetClinicId) || clinicList[0];
+          }
         }
-      }
 
-      if (targetClinic) {
-        setRawClinic(targetClinic);
-        setClinicId(targetClinic._id);
-        setClinicName(targetClinic.name || '');
-        setClinicTagline(targetClinic.tagline || '');
-        setClinicPhone(targetClinic.phone || '');
-        setClinicEmail(targetClinic.email || '');
-        setClinicAddress(targetClinic.address || '');
-        setOpenDays(targetClinic.open_days || 'Mon - Sat');
-        setVisitHours(targetClinic.visit_hours || '09:00 AM - 08:00 PM');
-        
-        setIsLogo(targetClinic.is_logo ?? true);
-        setIsOpenDays(targetClinic.is_open_days ?? true);
-        setIsVisitingHours(targetClinic.is_visiting_hours ?? true);
-        setIsStamp(targetClinic.is_stamp ?? true);
-        setIsDoctorSignature(targetClinic.is_doctor_signature ?? true);
+        if (targetClinic) {
+          setRawClinic(targetClinic);
+          setClinicId(targetClinic._id);
+          setClinicName(targetClinic.name || '');
+          setClinicTagline(targetClinic.tagline || '');
+          setClinicPhone(targetClinic.phone || '');
+          setClinicEmail(targetClinic.email || '');
+          setClinicAddress(targetClinic.address || '');
+          setOpenDays(targetClinic.open_days || 'Mon - Sat');
+          setVisitHours(targetClinic.visit_hours || '09:00 AM - 08:00 PM');
+          
+          setIsLogo(targetClinic.is_logo ?? true);
+          setIsOpenDays(targetClinic.is_open_days ?? true);
+          setIsVisitingHours(targetClinic.is_visiting_hours ?? true);
+          setIsStamp(targetClinic.is_stamp ?? true);
+          setIsDoctorSignature(targetClinic.is_doctor_signature ?? true);
 
-        // Assets: supports both direct Cloudinary URL strings and { secure_url } objects
-        const resolvedLogo = resolveAssetUrl(targetClinic.logo) || resolveAssetUrl(targetClinic.profile_url);
-        const resolvedStamp = resolveAssetUrl(targetClinic.stamp);
-        const resolvedSignature = resolveAssetUrl(targetClinic.doctor_signature);
+          // Assets: supports both direct Cloudinary URL strings and { secure_url } objects
+          const resolvedLogo = resolveAssetUrl(targetClinic.logo) || resolveAssetUrl(targetClinic.profile_url);
+          const resolvedStamp = resolveAssetUrl(targetClinic.stamp);
+          const resolvedSignature = resolveAssetUrl(targetClinic.doctor_signature);
 
-        setClinicLogo(resolvedLogo);
-        setClinicStamp(resolvedStamp);
-        setDoctorSignature(resolvedSignature);
+          setClinicLogo(resolvedLogo);
+          setClinicStamp(resolvedStamp);
+          setDoctorSignature(resolvedSignature);
 
-        // Resolve Primary Doctor of this clinic
-        const doctors = targetClinic.doctors || [];
-        const primaryDoc = doctors.find(d => d.is_primary) || doctors[0] || null;
-        if (primaryDoc) {
-          setPrimaryDoctor(primaryDoc);
-          setDocName(primaryDoc.full_name || '');
-          setDocPhone(primaryDoc.phone || '');
-          setDocQualification(primaryDoc.qualification || '');
-          setDocRegNumber(primaryDoc.registration_number || '');
+          // Resolve Primary Doctor of this clinic
+          const doctors = targetClinic.doctors || [];
+          const primaryDoc = doctors.find(d => d.is_primary) || doctors[0] || null;
+          if (primaryDoc) {
+            setPrimaryDoctor(primaryDoc);
+            setDocName(primaryDoc.full_name || '');
+            setDocPhone(primaryDoc.phone || '');
+            setDocQualification(primaryDoc.qualification || '');
+            setDocRegNumber(primaryDoc.registration_number || '');
+          }
+
+          // Populate Administration & Governance Settings
+          const adm = targetClinic.admin_settings || {};
+          setAdminStatus(adm.status || 'active');
+          setSuspensionReason(adm.suspension_reason || '');
+          if (adm.enabled_modules) {
+            setEnabledModules(prev => ({ ...prev, ...adm.enabled_modules }));
+          }
+          if (adm.staff_section_access) {
+            setStaffSectionAccess(prev => ({ ...prev, ...adm.staff_section_access }));
+          }
+          if (adm.allow_staff_password_change !== undefined) setAllowStaffPasswordChange(adm.allow_staff_password_change);
+          if (adm.allow_staff_patient_registration !== undefined) setAllowStaffPatientRegistration(adm.allow_staff_patient_registration);
+          if (adm.allow_staff_data_export !== undefined) setAllowStaffDataExport(adm.allow_staff_data_export);
+          if (adm.allow_doctor_delete_records !== undefined) setAllowDoctorDeleteRecords(adm.allow_doctor_delete_records);
+          if (adm.require_patient_phone !== undefined) setRequirePatientPhone(adm.require_patient_phone);
+          if (adm.require_prescription_diagnosis !== undefined) setRequirePrescriptionDiagnosis(adm.require_prescription_diagnosis);
+          if (adm.session_timeout_minutes !== undefined) setSessionTimeoutMinutes(adm.session_timeout_minutes);
+          if (adm.enforce_strong_passwords !== undefined) setEnforceStrongPasswords(adm.enforce_strong_passwords);
+          if (adm.storage_limit_mb !== undefined) setStorageLimitMb(adm.storage_limit_mb);
+          if (adm.storage_warning_threshold !== undefined) setStorageWarningThreshold(adm.storage_warning_threshold);
+          if (adm.max_daily_appointments_per_doctor !== undefined) setMaxDailyAppointmentsPerDoctor(adm.max_daily_appointments_per_doctor);
         }
       }
     } catch (err) {
@@ -759,12 +866,57 @@ export default function Settings() {
     }
   };
 
+  // Submit Administration & Governance Settings API (Master Admin only)
+  const handleSaveAdminSettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!clinicId) return;
+    setSavingAdminSettings(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const payload = {
+        status: adminStatus,
+        suspension_reason: suspensionReason,
+        enabled_modules: enabledModules,
+        staff_section_access: staffSectionAccess,
+        allow_staff_password_change: allowStaffPasswordChange,
+        allow_staff_patient_registration: allowStaffPatientRegistration,
+        allow_staff_data_export: allowStaffDataExport,
+        allow_doctor_delete_records: allowDoctorDeleteRecords,
+        require_patient_phone: requirePatientPhone,
+        require_prescription_diagnosis: requirePrescriptionDiagnosis,
+        session_timeout_minutes: Number(sessionTimeoutMinutes) || 60,
+        enforce_strong_passwords: Boolean(enforceStrongPasswords),
+        storage_limit_mb: Number(storageLimitMb) || 500,
+        storage_warning_threshold: Number(storageWarningThreshold) || 80,
+        max_daily_appointments_per_doctor: Number(maxDailyAppointmentsPerDoctor) || 50,
+      };
+      await clinicAPI.updateClinicAdminSettings(clinicId, payload);
+      setSuccessMsg('Clinic administration & governance settings successfully saved and applied.');
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to update clinic administration settings.');
+    } finally {
+      setSavingAdminSettings(false);
+    }
+  };
+
   return (
     <div style={{ paddingBottom: '60px' }}>
       <div className="page-header" style={{ marginBottom: '20px' }}>
         <div>
-          <h1 className="page-title">Clinic Practice & System Settings</h1>
-          <p className="page-subtitle">Manage clinic branding, official stamps, digital signatures, practitioner profiles, and security</p>
+          <h1 className="page-title">
+            {isViewingOtherClinic 
+              ? (clinicName ? `${clinicName} • Clinic Settings` : 'Clinic Practice Settings')
+              : (isAdmin ? 'Platform & Account Settings' : 'Clinic Practice & System Settings')}
+          </h1>
+          <p className="page-subtitle">
+            {isViewingOtherClinic 
+              ? 'Configure practice branding, official stamps, digital signatures, and practitioner credentials for this clinic'
+              : (isAdmin 
+                ? 'Manage administrator profile credentials, permissions, and global medication presets'
+                : 'Manage clinic branding, official stamps, digital signatures, practitioner profiles, and security')}
+          </p>
         </div>
       </div>
 
@@ -783,103 +935,142 @@ export default function Settings() {
       <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '24px' }}>
         {/* Left Settings Navigation Sidebar */}
         <div className="settings-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div
-            className={`settings-nav-item ${activeTab === 'clinic' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('clinic');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            style={{ 
-              padding: '12px 16px', 
-              borderRadius: '10px', 
-              cursor: 'pointer',
-              fontWeight: activeTab === 'clinic' ? '600' : '500',
-              backgroundColor: activeTab === 'clinic' ? 'var(--color-primary-light)' : 'transparent',
-              color: activeTab === 'clinic' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-              <Hospital size={18} /> Clinic Practice & Branding
-            </span>
-          </div>
+          {canManageClinicSettings && (
+            <>
+              <div
+                className={`settings-nav-item ${activeTab === 'clinic' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('clinic');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'clinic' ? '600' : '500',
+                  backgroundColor: activeTab === 'clinic' ? 'var(--color-primary-light)' : 'transparent',
+                  color: activeTab === 'clinic' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                  <Hospital size={18} /> Clinic Practice & Branding
+                </span>
+              </div>
 
-          <div
-            className={`settings-nav-item ${activeTab === 'pdf_template' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('pdf_template');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            style={{ 
-              padding: '12px 16px', 
-              borderRadius: '10px', 
-              cursor: 'pointer',
-              fontWeight: activeTab === 'pdf_template' ? '600' : '500',
-              backgroundColor: activeTab === 'pdf_template' ? 'var(--color-primary-light)' : 'transparent',
-              color: activeTab === 'pdf_template' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-              <FileText size={18} /> PDF Template Studio
-            </span>
-          </div>
+              <div
+                className={`settings-nav-item ${activeTab === 'pdf_template' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('pdf_template');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'pdf_template' ? '600' : '500',
+                  backgroundColor: activeTab === 'pdf_template' ? 'var(--color-primary-light)' : 'transparent',
+                  color: activeTab === 'pdf_template' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                  <FileText size={18} /> PDF Template Studio
+                </span>
+              </div>
 
-          <div
-            className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('profile');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            style={{ 
-              padding: '12px 16px', 
-              borderRadius: '10px', 
-              cursor: 'pointer',
-              fontWeight: activeTab === 'profile' ? '600' : '500',
-              backgroundColor: activeTab === 'profile' ? 'var(--color-primary-light)' : 'transparent',
-              color: activeTab === 'profile' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-              <ShieldCheck size={18} /> My Profile & Permissions
-            </span>
-          </div>
+              {isAdmin && isViewingOtherClinic && (
+                <div
+                  className={`settings-nav-item ${activeTab === 'admin_governance' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('admin_governance');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  style={{ 
+                    padding: '12px 16px', 
+                    borderRadius: '10px', 
+                    cursor: 'pointer',
+                    fontWeight: activeTab === 'admin_governance' ? '600' : '500',
+                    backgroundColor: activeTab === 'admin_governance' ? 'var(--color-primary-light)' : 'transparent',
+                    color: activeTab === 'admin_governance' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s',
+                    border: activeTab === 'admin_governance' ? '1px solid var(--color-primary)' : '1px solid transparent'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                    <ShieldCheck size={18} /> Administration & Governance
+                  </span>
+                  <span className="badge-pill badge-primary" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                    Admin Only
+                  </span>
+                </div>
+              )}
+            </>
+          )}
 
-          <div
-            className={`settings-nav-item ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('security');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            style={{ 
-              padding: '12px 16px', 
-              borderRadius: '10px', 
-              cursor: 'pointer',
-              fontWeight: activeTab === 'security' ? '600' : '500',
-              backgroundColor: activeTab === 'security' ? 'var(--color-primary-light)' : 'transparent',
-              color: activeTab === 'security' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.2s'
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-              <Key size={18} /> Password Security
-            </span>
-            {isStaff && (
-              <span className="badge-pill badge-warning" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                <Lock size={10} /> Locked
-              </span>
-            )}
-          </div>
+          {!isViewingOtherClinic && (
+            <>
+              <div
+                className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('profile');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'profile' ? '600' : '500',
+                  backgroundColor: activeTab === 'profile' ? 'var(--color-primary-light)' : 'transparent',
+                  color: activeTab === 'profile' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                  <ShieldCheck size={18} /> My Profile & Permissions
+                </span>
+              </div>
 
-          {isAdmin && (
+              <div
+                className={`settings-nav-item ${activeTab === 'security' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('security');
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '10px', 
+                  cursor: 'pointer',
+                  fontWeight: activeTab === 'security' ? '600' : '500',
+                  backgroundColor: activeTab === 'security' ? 'var(--color-primary-light)' : 'transparent',
+                  color: activeTab === 'security' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
+                  <Key size={18} /> Password Security
+                </span>
+                {isStaff && (
+                  <span className="badge-pill badge-warning" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                    <Lock size={10} /> Locked
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+
+          {isAdmin && !isViewingOtherClinic && (
             <div
               className={`settings-nav-item ${activeTab === 'medicine_presets' ? 'active' : ''}`}
               onClick={() => {
@@ -909,12 +1100,12 @@ export default function Settings() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-tertiary)' }}>
               <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px', display: 'block', color: 'var(--color-primary)' }} />
-              Loading clinic settings and branding...
+              {isViewingOtherClinic ? 'Loading clinic settings...' : (isAdmin ? 'Loading account settings...' : 'Loading clinic settings and branding...')}
             </div>
           ) : (
             <>
               {/* TAB: PDF TEMPLATE STUDIO */}
-              {activeTab === 'pdf_template' && (
+              {canManageClinicSettings && activeTab === 'pdf_template' && (
                 <PdfTemplateStudio 
                   clinic={rawClinic || { 
                     _id: clinicId, 
@@ -936,7 +1127,7 @@ export default function Settings() {
               )}
 
               {/* TAB 1: CLINIC PRACTICE & BRANDING */}
-              {activeTab === 'clinic' && (
+              {canManageClinicSettings && activeTab === 'clinic' && (
                 <div>
                   <form onSubmit={handleClinicSubmit}>
                     {/* SECTION 1: PRIMARY DOCTOR CREDENTIALS */}
@@ -1060,13 +1251,13 @@ export default function Settings() {
                             )}
                           </div>
 
-                          <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--color-border)', borderRadius: '8px', marginBottom: '12px', overflow: 'hidden', background: 'var(--color-bg-secondary)' }}>
+                          <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--color-border)', borderRadius: '8px', marginBottom: '12px', overflow: 'hidden', background: 'var(--color-bg-secondary)', padding: '8px' }}>
                             {clinicLogo ? (
                               <img src={clinicLogo} alt="Clinic Logo" style={{ maxHeight: '90px', maxWidth: '100%', objectFit: 'contain' }} />
                             ) : (
-                              <div style={{ textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-                                <ImageIcon size={24} style={{ margin: '0 auto 4px', display: 'block', opacity: 0.5 }} />
-                                <span style={{ fontSize: '11px' }}>No logo uploaded</span>
+                              <div style={{ textAlign: 'center' }}>
+                                <img src="/adixon-logo.png" alt="Default Adixon Brand Logo" style={{ height: '38px', maxWidth: '130px', objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
+                                <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', fontWeight: '500' }}>Default Adixon Brand Logo</span>
                               </div>
                             )}
                           </div>
@@ -1283,8 +1474,12 @@ export default function Settings() {
                         {/* Letterhead Top Row */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f766e', paddingBottom: '16px', marginBottom: '16px' }}>
                           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                            {isLogo && clinicLogo && (
-                              <img src={clinicLogo} alt="Logo" style={{ height: '60px', width: '60px', objectFit: 'contain' }} />
+                            {isLogo && (
+                              <img 
+                                src={clinicLogo || '/adixon-logo.png'} 
+                                alt="Logo" 
+                                style={{ height: '48px', maxWidth: '140px', objectFit: 'contain' }} 
+                              />
                             )}
                             <div>
                               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0f766e', letterSpacing: '-0.3px' }}>
@@ -1458,7 +1653,7 @@ export default function Settings() {
               )}
 
               {/* TAB 2: MY ACCOUNT PROFILE & SYSTEM PERMISSIONS */}
-              {activeTab === 'profile' && (
+              {!isViewingOtherClinic && activeTab === 'profile' && (
                 <div>
                   {/* HERO IDENTITY & SCOPE OVERVIEW CARD */}
                   <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
@@ -1578,21 +1773,23 @@ export default function Settings() {
 
                     {/* METADATA CARDS: CLINIC SCOPE & SUPERVISION */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                      {/* Assigned Clinic */}
+                      {/* Assigned Clinic / Platform Scope */}
                       <div style={{ background: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(13, 148, 136, 0.1)', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Hospital size={16} />
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: (isAdmin && !isViewingOtherClinic) ? 'rgba(79, 70, 229, 0.1)' : 'rgba(13, 148, 136, 0.1)', color: (isAdmin && !isViewingOtherClinic) ? '#4f46e5' : '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {(isAdmin && !isViewingOtherClinic) ? <ShieldCheck size={16} /> : <Hospital size={16} />}
                           </div>
                           <div>
-                            <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>Assigned Clinic</div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', fontWeight: '600', textTransform: 'uppercase' }}>
+                              {(isAdmin && !isViewingOtherClinic) ? 'System Scope' : 'Assigned Clinic'}
+                            </div>
                             <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                              {user?.clinic_id?.name || clinicName || 'Adixon Central Healthcare'}
+                              {(isAdmin && !isViewingOtherClinic) ? 'Master Platform Administrator' : (rawClinic?.name || clinicName || user?.clinic_id?.name || 'Adixon Health Network')}
                             </div>
                           </div>
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', paddingLeft: '42px', lineHeight: '1.4' }}>
-                          {user?.clinic_id?.address || clinicAddress || 'Registered Clinic Facility Address'}
+                          {(isAdmin && !isViewingOtherClinic) ? 'Global superuser oversight across all platform clinics and system users' : (rawClinic?.address || clinicAddress || user?.clinic_id?.address || 'Registered Clinic Facility Address')}
                         </div>
                       </div>
 
@@ -1874,7 +2071,7 @@ export default function Settings() {
               )}
 
               {/* TAB 3: PASSWORD SECURITY (STAFF RESTRICTED) */}
-              {activeTab === 'security' && (
+              {!isViewingOtherClinic && activeTab === 'security' && (
                 <div>
                   <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '20px', color: 'var(--color-text-primary)' }}>
                     Account Password Security
@@ -1930,7 +2127,7 @@ export default function Settings() {
               )}
 
               {/* TAB 4: MEDICINE PRESETS & OPTIONS (MASTER ADMIN) */}
-              {activeTab === 'medicine_presets' && isAdmin && (
+              {!isViewingOtherClinic && isAdmin && activeTab === 'medicine_presets' && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <div>
@@ -2073,6 +2270,664 @@ export default function Settings() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: ADMINISTRATION & GOVERNANCE (MASTER ADMIN MANAGING CLINIC) */}
+              {isViewingOtherClinic && isAdmin && activeTab === 'admin_governance' && (
+                <div>
+                  {/* Top Bar with Title and Action Button */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                          Clinic Administration & Governance
+                        </h2>
+                        <span className="badge-pill badge-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+                          <ShieldCheck size={12} /> Master Admin Authority
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>
+                        Control functional modules, restrict sections visible to clinic staff, configure operational status, and enforce clinical safeguards.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveAdminSettings}
+                      disabled={savingAdminSettings}
+                      style={{ padding: '10px 20px', fontSize: '14px', gap: '8px' }}
+                    >
+                      {savingAdminSettings ? <RefreshCw size={16} className="spin" /> : <Save size={16} />}
+                      {savingAdminSettings ? 'Saving Policies...' : 'Save Administration Settings'}
+                    </button>
+                  </div>
+
+                  {/* 1. CLINIC OPERATIONAL STATUS & ACCESS CONTROL */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                      <Activity size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                        Clinic Operational Status & Governance State
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                      {/* Active Option */}
+                      <div 
+                        onClick={() => setAdminStatus('active')}
+                        style={{
+                          padding: '16px',
+                          borderRadius: '10px',
+                          border: adminStatus === 'active' ? '2px solid #10b981' : '1px solid var(--color-border)',
+                          backgroundColor: adminStatus === 'active' ? 'rgba(16, 185, 129, 0.08)' : 'var(--color-bg-primary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '14px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={16} /> Active (Standard)
+                          </span>
+                          <input type="radio" checked={adminStatus === 'active'} onChange={() => setAdminStatus('active')} />
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                          Full operations enabled. Doctors and authorized clinic staff can log in, create prescriptions, and consult patients.
+                        </p>
+                      </div>
+
+                      {/* Suspended Option */}
+                      <div 
+                        onClick={() => setAdminStatus('suspended')}
+                        style={{
+                          padding: '16px',
+                          borderRadius: '10px',
+                          border: adminStatus === 'suspended' ? '2px solid #ef4444' : '1px solid var(--color-border)',
+                          backgroundColor: adminStatus === 'suspended' ? 'rgba(239, 68, 68, 0.08)' : 'var(--color-bg-primary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '14px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ShieldAlert size={16} /> Suspended (Revoked)
+                          </span>
+                          <input type="radio" checked={adminStatus === 'suspended'} onChange={() => setAdminStatus('suspended')} />
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                          Access immediately blocked for all clinic doctors and staff. Login attempts are denied with custom notice.
+                        </p>
+                      </div>
+
+                      {/* Read Only Option */}
+                      <div 
+                        onClick={() => setAdminStatus('read_only')}
+                        style={{
+                          padding: '16px',
+                          borderRadius: '10px',
+                          border: adminStatus === 'read_only' ? '2px solid #f59e0b' : '1px solid var(--color-border)',
+                          backgroundColor: adminStatus === 'read_only' ? 'rgba(245, 158, 11, 0.08)' : 'var(--color-bg-primary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '14px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Lock size={16} /> Read-Only (Auditing)
+                          </span>
+                          <input type="radio" checked={adminStatus === 'read_only'} onChange={() => setAdminStatus('read_only')} />
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                          Staff and doctors can view historical clinical records, but creating or modifying any data is strictly barred.
+                        </p>
+                      </div>
+                    </div>
+
+                    {(adminStatus === 'suspended' || adminStatus === 'read_only') && (
+                      <div style={{ marginTop: '14px' }}>
+                        <label className="form-label" style={{ fontWeight: '600', fontSize: '12px' }}>
+                          Administrative Reason / Message Displayed to Clinic Users
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="e.g. Account suspended pending subscription renewal or regulatory review..."
+                          value={suspensionReason}
+                          onChange={(e) => setSuspensionReason(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. CLINIC PLATFORM MODULES (Functional Modules Enabled for the Clinic) */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Layers size={18} style={{ color: 'var(--color-primary)' }} />
+                          <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                            Clinic Platform Modules
+                          </h3>
+                          <span className="badge-pill" style={{ fontSize: '11px', background: 'var(--color-bg-primary)' }}>
+                            {Object.values(enabledModules).filter(Boolean).length} / {ALL_CLINIC_MODULES.length} Activated
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>
+                          Master activation switches for features available in this clinic. Disabled modules are hidden from navigation for all users in this clinic.
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                          onClick={() => {
+                            const updated = {};
+                            ALL_CLINIC_MODULES.forEach(m => { updated[m.key] = true; });
+                            setEnabledModules(updated);
+                          }}
+                        >
+                          Enable All Modules
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                          onClick={() => {
+                            setEnabledModules(prev => ({
+                              ...prev,
+                              certificates: false,
+                              consents: false,
+                              instructions: false,
+                              templates: false
+                            }));
+                          }}
+                        >
+                          Disable Optional
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                      {ALL_CLINIC_MODULES.map((mod) => {
+                        const isEnabled = enabledModules[mod.key] !== false;
+                        return (
+                          <div 
+                            key={mod.key}
+                            onClick={() => setEnabledModules(prev => ({ ...prev, [mod.key]: !isEnabled }))}
+                            style={{
+                              padding: '14px',
+                              borderRadius: '10px',
+                              border: isEnabled ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                              backgroundColor: isEnabled ? 'rgba(15, 118, 110, 0.05)' : 'var(--color-bg-primary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ color: isEnabled ? 'var(--color-primary)' : 'var(--color-text-tertiary)' }}>
+                                  {mod.icon}
+                                </span>
+                                <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--color-text-primary)' }}>
+                                  {mod.label}
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', margin: '0 0 6px 0', lineHeight: 1.3 }}>
+                                {mod.desc}
+                              </p>
+                              <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
+                                {mod.group}
+                              </span>
+                            </div>
+
+                            <div style={{ paddingTop: '2px' }}>
+                              {isEnabled ? (
+                                <ToggleRight size={26} style={{ color: 'var(--color-primary)' }} />
+                              ) : (
+                                <ToggleLeft size={26} style={{ color: 'var(--color-text-tertiary)' }} />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. SECTIONS ALLOWED TO BE SEEN BY CLINIC STAFF */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Eye size={18} style={{ color: '#0284c7' }} />
+                          <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                            Sections Visible to Clinic Staff
+                          </h3>
+                          <span className="badge-pill" style={{ fontSize: '11px', background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
+                            {Object.values(staffSectionAccess).filter(Boolean).length} / {ALL_CLINIC_MODULES.length} Staff-Visible
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginTop: '4px' }}>
+                          Granular section visibility for non-doctor clinic staff (receptionists, nursing assistants). Staff members cannot see or open unselected sections.
+                        </p>
+                      </div>
+
+                      {/* Presets */}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                          onClick={() => {
+                            setStaffSectionAccess({
+                              dashboard: true,
+                              patients: true,
+                              appointments: true,
+                              prescriptions: false,
+                              medicines: true,
+                              certificates: false,
+                              instructions: true,
+                              consents: true,
+                              templates: false,
+                              staff_management: false,
+                              clinic_settings: false,
+                              reports_analytics: false,
+                              billing_invoices: true,
+                              storage_footprint: false,
+                            });
+                          }}
+                        >
+                          Preset: Receptionist
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                          onClick={() => {
+                            setStaffSectionAccess({
+                              dashboard: true,
+                              patients: true,
+                              appointments: true,
+                              prescriptions: true,
+                              medicines: true,
+                              certificates: true,
+                              instructions: true,
+                              consents: true,
+                              templates: true,
+                              staff_management: false,
+                              clinic_settings: false,
+                              reports_analytics: false,
+                              billing_invoices: true,
+                              storage_footprint: false,
+                            });
+                          }}
+                        >
+                          Preset: Clinical Assistant
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px' }}
+                          onClick={() => {
+                            const all = {};
+                            ALL_CLINIC_MODULES.forEach(m => { all[m.key] = true; });
+                            setStaffSectionAccess(all);
+                          }}
+                        >
+                          Allow All
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                      {ALL_CLINIC_MODULES.map((mod) => {
+                        const isVisibleToStaff = staffSectionAccess[mod.key] === true;
+                        const isClinicModuleDisabled = enabledModules[mod.key] === false;
+
+                        return (
+                          <div 
+                            key={mod.key}
+                            onClick={() => {
+                              if (isClinicModuleDisabled) return;
+                              setStaffSectionAccess(prev => ({ ...prev, [mod.key]: !isVisibleToStaff }));
+                            }}
+                            style={{
+                              padding: '14px',
+                              borderRadius: '10px',
+                              border: isVisibleToStaff ? '1px solid #0284c7' : '1px solid var(--color-border)',
+                              backgroundColor: isClinicModuleDisabled 
+                                ? 'rgba(0, 0, 0, 0.04)' 
+                                : isVisibleToStaff ? 'rgba(2, 132, 199, 0.05)' : 'var(--color-bg-primary)',
+                              opacity: isClinicModuleDisabled ? 0.5 : 1,
+                              cursor: isClinicModuleDisabled ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ color: isVisibleToStaff ? '#0284c7' : 'var(--color-text-tertiary)' }}>
+                                  {mod.icon}
+                                </span>
+                                <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--color-text-primary)' }}>
+                                  {mod.label}
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', margin: '0 0 6px 0', lineHeight: 1.3 }}>
+                                {mod.desc}
+                              </p>
+                              {isClinicModuleDisabled ? (
+                                <span style={{ fontSize: '10px', color: '#ef4444' }}>Module disabled for clinic</span>
+                              ) : (
+                                <span style={{ fontSize: '10px', color: isVisibleToStaff ? '#0284c7' : 'var(--color-text-tertiary)' }}>
+                                  {isVisibleToStaff ? 'Visible to Staff' : 'Hidden from Staff'}
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ paddingTop: '2px' }}>
+                              {isVisibleToStaff ? (
+                                <Eye size={20} style={{ color: '#0284c7' }} />
+                              ) : (
+                                <EyeOff size={20} style={{ color: 'var(--color-text-tertiary)' }} />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 4. STAFF & DOCTOR ROLE GOVERNANCE POLICIES */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                      <UsersIcon size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                        Staff & Doctor Role Governance Policies
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+                      {/* Allow Staff Password Change */}
+                      <div 
+                        onClick={() => setAllowStaffPasswordChange(!allowStaffPasswordChange)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Allow Doctor to Reset Staff Passwords
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            Permits the primary doctor to change credentials for staff directly in Clinic Staff list.
+                          </span>
+                        </div>
+                        {allowStaffPasswordChange ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+
+                      {/* Allow Staff Patient Registration */}
+                      <div 
+                        onClick={() => setAllowStaffPatientRegistration(!allowStaffPatientRegistration)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Allow Staff Patient Registration
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            Permits receptionists and staff members to enroll new patient records into EHR.
+                          </span>
+                        </div>
+                        {allowStaffPatientRegistration ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+
+                      {/* Allow Staff Data Export */}
+                      <div 
+                        onClick={() => setAllowStaffDataExport(!allowStaffDataExport)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Allow Staff Data Export
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            Permits non-doctor staff to export patient listings and clinical tables to CSV / Excel.
+                          </span>
+                        </div>
+                        {allowStaffDataExport ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+
+                      {/* Allow Doctor Delete Records */}
+                      <div 
+                        onClick={() => setAllowDoctorDeleteRecords(!allowDoctorDeleteRecords)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Allow Doctor Prescription Deletion
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            When disabled, finalized prescriptions cannot be deleted by clinic doctors (audit integrity).
+                          </span>
+                        </div>
+                        {allowDoctorDeleteRecords ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. CLINICAL SAFEGUARDS & LIMITS */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                      <Stethoscope size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                        Clinical Rules & Consultation Quotas
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                      {/* Require Patient Phone */}
+                      <div 
+                        onClick={() => setRequirePatientPhone(!requirePatientPhone)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Mandatory Patient Phone Number
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            Disallows registering patients without a valid 10-digit mobile number.
+                          </span>
+                        </div>
+                        {requirePatientPhone ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+
+                      {/* Require Prescription Diagnosis */}
+                      <div 
+                        onClick={() => setRequirePrescriptionDiagnosis(!requirePrescriptionDiagnosis)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ paddingRight: '12px' }}>
+                          <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                            Mandatory Prescription Diagnosis
+                          </span>
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                            Requires practitioner to supply clinical diagnosis before issuing Rx.
+                          </span>
+                        </div>
+                        {requirePrescriptionDiagnosis ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                      </div>
+                    </div>
+
+                    <div className="form-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: '600', fontSize: '12px' }}>
+                          Max Daily Appointments per Doctor
+                        </label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min="1"
+                          max="500"
+                          value={maxDailyAppointmentsPerDoctor}
+                          onChange={(e) => setMaxDailyAppointmentsPerDoctor(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 6. STORAGE QUOTA & SECURITY SETTINGS */}
+                  <div style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '20px', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                      <HardDrive size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: 'var(--color-text-primary)' }}>
+                        Storage Allocation & Security Controls
+                      </h3>
+                    </div>
+
+                    <div className="form-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: '600', fontSize: '12px' }}>
+                          Allocated Storage Limit (MB)
+                        </label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min="50"
+                          max="50000"
+                          value={storageLimitMb}
+                          onChange={(e) => setStorageLimitMb(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: '600', fontSize: '12px' }}>
+                          Storage Warning Alert Threshold (%)
+                        </label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min="50"
+                          max="99"
+                          value={storageWarningThreshold}
+                          onChange={(e) => setStorageWarningThreshold(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: '600', fontSize: '12px' }}>
+                          Session Inactivity Timeout (Minutes)
+                        </label>
+                        <input
+                          type="number"
+                          className="input-field"
+                          min="5"
+                          max="480"
+                          value={sessionTimeoutMinutes}
+                          onChange={(e) => setSessionTimeoutMinutes(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div 
+                      onClick={() => setEnforceStrongPasswords(!enforceStrongPasswords)}
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ paddingRight: '12px' }}>
+                        <span style={{ fontWeight: '600', fontSize: '13px', display: 'block', color: 'var(--color-text-primary)' }}>
+                          Enforce Strong Password Complexity
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                          Requires min 8 chars including capital letter, number, and special character.
+                        </span>
+                      </div>
+                      {enforceStrongPasswords ? <ToggleRight size={28} style={{ color: 'var(--color-primary)' }} /> : <ToggleLeft size={28} style={{ color: 'var(--color-text-tertiary)' }} />}
+                    </div>
+                  </div>
+
+                  {/* Bottom Save Action Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveAdminSettings}
+                      disabled={savingAdminSettings}
+                      style={{ padding: '10px 24px', fontSize: '14px', gap: '8px' }}
+                    >
+                      {savingAdminSettings ? <RefreshCw size={16} className="spin" /> : <Save size={16} />}
+                      {savingAdminSettings ? 'Saving Settings...' : 'Save Administration Settings'}
+                    </button>
                   </div>
                 </div>
               )}

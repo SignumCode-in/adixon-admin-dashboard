@@ -20,13 +20,17 @@ import {
   X, 
   ArrowLeft, 
   CheckCircle2, 
-  ExternalLink 
+  ExternalLink,
+  Phone,
+  Building
 } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
 
 export default function Patients() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const activeClinicId = useActiveClinicScope();
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_patients') || 'list');
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -169,7 +173,7 @@ export default function Patients() {
     setLoading(true);
     setError('');
     try {
-      const params = { limit: 200 };
+      const params = { limit: 2000 };
       const targetClinic = (activeClinicId && activeClinicId !== 'all') 
         ? activeClinicId 
         : (filterClinicId && filterClinicId !== 'all' ? filterClinicId : null);
@@ -450,16 +454,6 @@ export default function Patients() {
           }
         });
         setSuccess('Rx prescription slip created successfully.');
-      } else if (activeTab === 'labs') {
-        const testArray = quickTests.split(',').map(t => t.trim()).filter(Boolean);
-        await labAPI.createLab({
-          patient_id: viewingPatient._id,
-          doctor_id: docId,
-          clinic_id: clinicId,
-          prescription_id: '6a55ce3df5878a83c6b4e277',
-          lab_test: testArray
-        });
-        setSuccess('Lab diagnostic order requested.');
       } else if (activeTab === 'certificates') {
         await certificateAPI.createCertificate({
           patient_id: viewingPatient._id,
@@ -817,14 +811,99 @@ export default function Patients() {
               </select>
             </div>
           )}
+
+          <ViewToggle 
+            mode={displayMode} 
+            onChange={(m) => {
+              setDisplayMode(m);
+              localStorage.setItem('adixon_view_mode_patients', m);
+            }} 
+          />
         </div>
 
-        <div className="table-responsive">
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading patient files...</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient files registered.</div>
-          ) : (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading patient files...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient files registered.</div>
+        ) : displayMode === 'grid' ? (
+          <div className="records-grid">
+            {filtered.map((p) => (
+              <div key={p._id} className="record-card">
+                <div className="record-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: p.gender === 'Female' ? 'rgba(236, 72, 153, 0.15)' : 'var(--color-primary-light)', color: p.gender === 'Female' ? '#ec4899' : 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                      {(p.full_name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div 
+                        style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => navigate(user?.role === 'admin' ? `/admin/patients/${p._id}` : `/patients/${p._id}`)}
+                      >
+                        {p.full_name}
+                        <ExternalLink size={12} />
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                        {p.age ? `${p.age} Yrs` : ''} {p.gender ? `• ${p.gender}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  {p.blood_group && (
+                    <span className="badge badge-info" style={{ fontSize: '11px', fontWeight: '600' }}>
+                      {p.blood_group}
+                    </span>
+                  )}
+                </div>
+
+                <div className="record-card-body">
+                  <div className="record-card-row">
+                    <Phone size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                    <span>{p.phone || 'No phone'}</span>
+                  </div>
+                  {p.email && (
+                    <div className="record-card-row">
+                      <span>✉️ {p.email}</span>
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div className="record-card-row">
+                      <Building size={13} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                      <span>Clinic: {p.clinic_id?.name || 'Clinic'}</span>
+                    </div>
+                  )}
+                  {p.allergies && (
+                    <div style={{ fontSize: '11px', color: 'var(--color-danger)', background: 'var(--color-danger-light)', padding: '4px 8px', borderRadius: '4px', marginTop: '2px' }}>
+                      ⚠️ Allergy: {p.allergies}
+                    </div>
+                  )}
+                  {p.address && (
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      📍 {p.address}
+                    </div>
+                  )}
+                </div>
+
+                <div className="record-card-footer">
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                    onClick={() => navigate(user?.role === 'admin' ? `/admin/patients/${p._id}` : `/patients/${p._id}`)}
+                  >
+                    <ExternalLink size={12} /> EHR Profile
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px' }} onClick={() => handleOpenEdit(p)}>
+                      <Edit2 size={12} /> Edit
+                    </button>
+                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} onClick={() => triggerDelete(p._id)}>
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="table-responsive">
             <table className="data-table">
               <thead>
                 <tr>
@@ -839,7 +918,12 @@ export default function Patients() {
               </thead>
               <tbody>
                 {filtered.map((p) => (
-                  <tr key={p._id} onClick={() => navigate(`/patients/${p._id}`)} style={{ cursor: 'pointer' }}>
+                  <tr 
+                    key={p._id} 
+                    onClick={() => navigate(user?.role === 'admin' ? `/admin/patients/${p._id}` : `/patients/${p._id}`)} 
+                    style={{ cursor: 'pointer' }}
+                    title={`Click to view ${p.full_name}'s complete EHR & profile`}
+                  >
                     <td style={{ fontWeight: 'bold' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
                         <User size={16} />
@@ -874,8 +958,8 @@ export default function Patients() {
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Right Patient Profile Dashboard Side Panel */}
@@ -949,8 +1033,7 @@ export default function Patients() {
               { id: 'certificates', label: 'Certificates', icon: Clipboard },
               { id: 'instructions', label: 'Guides', icon: FileText },
               { id: 'consents', label: 'Consents', icon: ClipboardCheck },
-              { id: 'appointments', label: 'Appts', icon: Calendar },
-              { id: 'labs', label: 'Labs', icon: FlaskConical }
+              { id: 'appointments', label: 'Appts', icon: Calendar }
             ].map(tab => (
               <button 
                 key={tab.id}

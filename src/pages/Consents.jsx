@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import PdfPreviewModal from '../components/PdfPreviewModal';
-import { ClipboardCheck, PlusCircle, Search, Trash2, User, ArrowLeft, Printer } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
+import { ClipboardCheck, PlusCircle, Search, Trash2, User, ArrowLeft, Printer, Calendar, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 export default function Consents() {
   const { user } = useAuth();
@@ -17,6 +18,14 @@ export default function Consents() {
 
   // Search
   const [search, setSearch] = useState('');
+
+  // Display Mode: 'list' | 'grid'
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_consents') || 'list');
+
+  const handleDisplayModeChange = (mode) => {
+    setDisplayMode(mode);
+    localStorage.setItem('adixon_view_mode_consents', mode);
+  };
 
   // View Mode: 'list' | 'editor'
   const [viewMode, setViewMode] = useState('list');
@@ -44,8 +53,8 @@ export default function Consents() {
       const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
       const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [consRes, patientsRes] = await Promise.all([
-        consentAPI.getConsents({ ...clinicFilter, limit: 100 }),
-        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
+        consentAPI.getConsents({ ...clinicFilter, limit: 1000 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 1000 }),
       ]);
 
       if (consRes && consRes.data) setConsents(consRes.data);
@@ -252,7 +261,7 @@ export default function Consents() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
           <input
             type="text"
@@ -264,14 +273,75 @@ export default function Consents() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle mode={displayMode} onChange={handleDisplayModeChange} />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading consents database...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient consents logged.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading consents database...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No patient consents logged.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((c) => (
+            <div key={c._id} className="record-card">
+              <div className="record-card-header">
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={15} color="var(--color-primary)" />
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {c.patient_id?.full_name || 'Walk-in Patient'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={12} />
+                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
+                  </div>
+                </div>
+                <span className="badge badge-info" style={{ fontSize: '11px' }}>
+                  {c.title || 'Consent Form'}
+                </span>
+              </div>
+
+              <div className="record-card-body">
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', padding: '8px 10px', borderRadius: '6px', maxHeight: '64px', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4' }}>
+                  "{c.content}"
+                </div>
+                <div className="record-card-row" style={{ marginTop: '8px' }}>
+                  <span className="record-card-label">Patient Sign:</span>
+                  <span className="record-card-value" style={{ fontStyle: 'italic', fontFamily: 'cursive' }}>
+                    {c.patient_signature || 'Signed'}
+                  </span>
+                </div>
+                <div className="record-card-row">
+                  <span className="record-card-label">Doctor Witness:</span>
+                  <span className="record-card-value">
+                    {c.doctor_signature || 'Dr. Witness'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="record-card-footer">
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '5px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => {
+                    setPreviewConsent(c);
+                    setPdfModalOpen(true);
+                  }}
+                >
+                  <Printer size={13} /> View PDF
+                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)} title="Delete consent">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -299,6 +369,9 @@ export default function Consents() {
                   </td>
                   <td style={{ fontStyle: 'italic', fontFamily: 'cursive' }}>{c.patient_signature || 'Not Signed'}</td>
                   <td>{c.doctor_signature || 'N/A'}</td>
+                  <td style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                  </td>
                   <td style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <button 
                       className="btn btn-secondary" 
@@ -319,8 +392,8 @@ export default function Consents() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal

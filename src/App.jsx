@@ -21,6 +21,8 @@ import ClinicOverview from './pages/ClinicOverview';
 import SecurityDashboard from './pages/SecurityDashboard';
 import AccessControl from './pages/AccessControl';
 import AuditLogs from './pages/AuditLogs';
+import PlatformStorage from './pages/PlatformStorage';
+import ClinicStoragePage from './pages/ClinicStoragePage';
 
 // Core Clinical Pages
 import Dashboard from './pages/Dashboard';
@@ -29,7 +31,6 @@ import PatientDetails from './pages/PatientDetails';
 import Appointments from './pages/Appointments';
 import Prescriptions from './pages/Prescriptions';
 import Medicines from './pages/Medicines';
-import Labs from './pages/Labs';
 import Certificates from './pages/Certificates';
 import Instructions from './pages/Instructions';
 import Consents from './pages/Consents';
@@ -71,7 +72,7 @@ export default function App() {
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<Analytics />} />
               <Route path="analytics" element={<Analytics />} />
-              <Route path="clinic-dashboard" element={<Dashboard />} />
+              <Route path="clinic-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
               {/* Multi-Tenant Clinic Management & Deep-Dive Scope */}
               <Route path="clinics" element={<Clinics />} />
@@ -82,15 +83,18 @@ export default function App() {
               <Route path="clinics/:clinicId/certificates" element={<Certificates />} />
               <Route path="clinics/:clinicId/instructions" element={<Instructions />} />
               <Route path="clinics/:clinicId/consents" element={<Consents />} />
-              <Route path="clinics/:clinicId/labs" element={<Labs />} />
               <Route path="clinics/:clinicId/templates" element={<Templates />} />
+              <Route path="clinics/:clinicId/medicines" element={<Medicines />} />
               <Route path="clinics/:clinicId/users" element={<Users />} />
+              <Route path="clinics/:clinicId/storage" element={<ClinicStoragePage />} />
               <Route path="clinics/:clinicId/settings" element={<Settings />} />
 
               {/* Global Inspector */}
               <Route path="patients/:patientId" element={<PatientDetails />} />
+              <Route path="medicines" element={<Medicines />} />
 
               {/* Governance, Security & System Administration */}
+              <Route path="storage" element={<PlatformStorage />} />
               <Route path="users" element={<Users />} />
               <Route path="security" element={<SecurityDashboard />} />
               <Route path="access-control" element={<AccessControl />} />
@@ -148,16 +152,6 @@ export default function App() {
                 element={
                   <PermissionGuard requiredPermission="medicines">
                     <Medicines />
-                  </PermissionGuard>
-                }
-              />
-
-              {/* Diagnostic Labs */}
-              <Route
-                path="/labs"
-                element={
-                  <PermissionGuard requiredPermission="labs">
-                    <Labs />
                   </PermissionGuard>
                 }
               />

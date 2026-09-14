@@ -19,9 +19,11 @@ import {
   ExternalLink,
   Settings,
   Plus,
-  FlaskConical
+  FlaskConical,
+  HardDrive
 } from 'lucide-react';
-import { clinicAPI, patientAPI, appointmentAPI, prescriptionAPI } from '../services/api';
+import { clinicAPI, patientAPI, appointmentAPI, prescriptionAPI, storageAPI } from '../services/api';
+import ClinicStorageModal, { formatBytes } from '../components/clinic/ClinicStorageModal';
 
 export default function ClinicOverview() {
   const { clinicId } = useParams();
@@ -32,6 +34,13 @@ export default function ClinicOverview() {
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
+  const [totalCounts, setTotalCounts] = useState({
+    patients: 0,
+    appointments: 0,
+    prescriptions: 0,
+  });
+  const [storageData, setStorageData] = useState(null);
+  const [storageModalOpen, setStorageModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,11 +52,12 @@ export default function ClinicOverview() {
   const loadClinicDetails = async () => {
     setLoading(true);
     try {
-      const [clinicRes, patientsRes, apptsRes, prescRes] = await Promise.allSettled([
+      const [clinicRes, patientsRes, apptsRes, prescRes, storageRes] = await Promise.allSettled([
         clinicAPI.getClinicById(clinicId),
         patientAPI.getPatients({ clinic_id: clinicId, limit: 10 }),
         appointmentAPI.getAppointments({ clinic_id: clinicId, limit: 10 }),
         prescriptionAPI.getPrescriptions({ clinic_id: clinicId, limit: 10 }),
+        storageAPI.getClinicStorage(clinicId),
       ]);
 
       if (clinicRes.status === 'fulfilled') {
@@ -56,13 +66,30 @@ export default function ClinicOverview() {
         setDoctors(cData?.doctors || []);
       }
 
-      const pList = patientsRes.status === 'fulfilled' ? (patientsRes.value?.data?.data || patientsRes.value?.data || []) : [];
-      const aList = apptsRes.status === 'fulfilled' ? (apptsRes.value?.data?.data || apptsRes.value?.data || []) : [];
-      const prList = prescRes.status === 'fulfilled' ? (prescRes.value?.data?.data || prescRes.value?.data || []) : [];
+      if (storageRes.status === 'fulfilled' && storageRes.value?.data) {
+        setStorageData(storageRes.value.data);
+      }
+
+      const pVal = patientsRes.status === 'fulfilled' ? patientsRes.value : null;
+      const aVal = apptsRes.status === 'fulfilled' ? apptsRes.value : null;
+      const prVal = prescRes.status === 'fulfilled' ? prescRes.value : null;
+
+      const pList = Array.isArray(pVal?.data) ? pVal.data : (Array.isArray(pVal?.data?.data) ? pVal.data.data : []);
+      const aList = Array.isArray(aVal?.data) ? aVal.data : (Array.isArray(aVal?.data?.data) ? aVal.data.data : []);
+      const prList = Array.isArray(prVal?.data) ? prVal.data : (Array.isArray(prVal?.data?.data) ? prVal.data.data : []);
+
+      const pTotal = pVal?.pagination?.total_records ?? pVal?.data?.pagination?.total_records ?? pVal?.count ?? pList.length;
+      const aTotal = aVal?.pagination?.total_records ?? aVal?.data?.pagination?.total_records ?? aVal?.count ?? aList.length;
+      const prTotal = prVal?.pagination?.total_records ?? prVal?.data?.pagination?.total_records ?? prVal?.count ?? prList.length;
 
       setPatients(Array.isArray(pList) ? pList : []);
       setAppointments(Array.isArray(aList) ? aList : []);
       setPrescriptions(Array.isArray(prList) ? prList : []);
+      setTotalCounts({
+        patients: pTotal,
+        appointments: aTotal,
+        prescriptions: prTotal,
+      });
     } catch (err) {
       console.error('Error loading clinic overview:', err);
     } finally {
@@ -138,16 +165,16 @@ export default function ClinicOverview() {
           <button 
             className="btn btn-secondary" 
             style={{ fontSize: '12px', gap: '6px' }}
-            onClick={() => navigate(`/admin/clinics/${clinicId}/labs`)}
+            onClick={() => navigate(`/admin/clinics/${clinicId}/users`)}
           >
-            <FlaskConical size={14} /> Lab Orders
+            <Users size={14} /> Staff & Doctors
           </button>
           <button 
             className="btn btn-secondary" 
             style={{ fontSize: '12px', gap: '6px' }}
-            onClick={() => navigate(`/admin/clinics/${clinicId}/users`)}
+            onClick={() => setStorageModalOpen(true)}
           >
-            <Users size={14} /> Staff & Doctors
+            <HardDrive size={14} /> Storage Footprint
           </button>
           <button 
             className="btn btn-secondary" 
@@ -160,7 +187,7 @@ export default function ClinicOverview() {
       </div>
 
       {/* KPI Stats Row */}
-      <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: '24px' }}>
+      <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '24px' }}>
         <div 
           className="card kpi-card" 
           onClick={() => navigate(`/admin/clinics/${clinicId}/patients`)}
@@ -169,7 +196,7 @@ export default function ClinicOverview() {
         >
           <div className="kpi-details">
             <span className="kpi-label">Registered Patients</span>
-            <span className="kpi-value">{patients.length}</span>
+            <span className="kpi-value">{totalCounts.patients}</span>
             <span className="kpi-trend up" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               View Patients <ChevronRight size={12} />
             </span>
@@ -187,7 +214,7 @@ export default function ClinicOverview() {
         >
           <div className="kpi-details">
             <span className="kpi-label">Appointments</span>
-            <span className="kpi-value">{appointments.length}</span>
+            <span className="kpi-value">{totalCounts.appointments}</span>
             <span className="kpi-trend up" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               View Appointments <ChevronRight size={12} />
             </span>
@@ -205,13 +232,31 @@ export default function ClinicOverview() {
         >
           <div className="kpi-details">
             <span className="kpi-label">Prescriptions</span>
-            <span className="kpi-value">{prescriptions.length}</span>
+            <span className="kpi-value">{totalCounts.prescriptions}</span>
             <span className="kpi-trend up" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               View Prescriptions <ChevronRight size={12} />
             </span>
           </div>
           <div className="kpi-icon-wrapper" style={{ backgroundColor: 'var(--color-info-light)', color: 'var(--color-info)' }}>
             <FileSpreadsheet size={20} />
+          </div>
+        </div>
+
+        <div 
+          className="card kpi-card" 
+          onClick={() => setStorageModalOpen(true)}
+          style={{ cursor: 'pointer' }}
+          title="Click to view clinic storage breakdown"
+        >
+          <div className="kpi-details">
+            <span className="kpi-label">Storage Consumed</span>
+            <span className="kpi-value">{formatBytes(storageData?.totalBytes || 0)}</span>
+            <span className="kpi-trend up" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Quota {storageData?.percentageUsed || 0}% • View <ChevronRight size={12} />
+            </span>
+          </div>
+          <div className="kpi-icon-wrapper" style={{ backgroundColor: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4' }}>
+            <HardDrive size={20} />
           </div>
         </div>
 
@@ -387,19 +432,44 @@ export default function ClinicOverview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {appointments.slice(0, 5).map((appt) => (
-                    <tr key={appt._id}>
-                      <td style={{ fontWeight: '500' }}>
-                        {appt.patient_id?.full_name || appt.patient_name || 'Patient'}
-                      </td>
-                      <td>{appt.appointment_date || appt.date || 'Today'}</td>
-                      <td>
-                        <span className={`badge badge-${appt.status === 'completed' ? 'success' : appt.status === 'cancelled' ? 'danger' : 'warning'}`} style={{ fontSize: '10px' }}>
-                          {appt.status || 'scheduled'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {appointments.slice(0, 5).map((appt) => {
+                    const patId = appt.patient_id?._id || (typeof appt.patient_id === 'string' ? appt.patient_id : null);
+                    return (
+                      <tr 
+                        key={appt._id}
+                        onClick={() => patId && navigate(`/admin/patients/${patId}`)}
+                        style={{ cursor: patId ? 'pointer' : 'default' }}
+                        title={patId ? "Click to view patient details" : ""}
+                      >
+                        <td style={{ fontWeight: '500', color: patId ? 'var(--color-primary)' : 'inherit' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{appt.patient_id?.full_name || appt.patient_name || 'Patient'}</span>
+                            {patId && <ExternalLink size={11} style={{ opacity: 0.7 }} />}
+                          </span>
+                        </td>
+                        <td>
+                          {(() => {
+                            const rawDate = appt.appointment_date || appt.date;
+                            if (!rawDate) return appt.time || 'Today';
+                            try {
+                              const d = new Date(rawDate);
+                              if (isNaN(d.getTime())) return `${rawDate} ${appt.time || ''}`.trim();
+                              const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                              const timeStr = appt.time || (String(rawDate).includes('T') ? d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+                              return timeStr ? `${dateStr} • ${timeStr}` : dateStr;
+                            } catch {
+                              return String(rawDate);
+                            }
+                          })()}
+                        </td>
+                        <td>
+                          <span className={`badge badge-${appt.status === 'completed' ? 'success' : appt.status === 'cancelled' ? 'danger' : 'warning'}`} style={{ fontSize: '10px' }}>
+                            {appt.status || 'scheduled'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -431,14 +501,37 @@ export default function ClinicOverview() {
                     <th>Patient Name</th>
                     <th>Phone</th>
                     <th>Gender</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {patients.slice(0, 5).map((pat) => (
-                    <tr key={pat._id}>
-                      <td style={{ fontWeight: '500' }}>{pat.full_name}</td>
+                    <tr 
+                      key={pat._id}
+                      onClick={() => navigate(`/admin/patients/${pat._id}`)}
+                      style={{ cursor: 'pointer' }}
+                      title={`Click to view ${pat.full_name}'s details`}
+                    >
+                      <td style={{ fontWeight: '600', color: 'var(--color-primary)' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Users size={13} />
+                          <span>{pat.full_name}</span>
+                        </span>
+                      </td>
                       <td>{pat.phone || 'N/A'}</td>
                       <td>{pat.gender || 'N/A'}</td>
+                      <td>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '2px 8px', fontSize: '11px', gap: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/patients/${pat._id}`);
+                          }}
+                        >
+                          <ExternalLink size={11} /> Details
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -447,6 +540,15 @@ export default function ClinicOverview() {
           </div>
         </div>
       </div>
+
+      {storageModalOpen && (
+        <ClinicStorageModal
+          isOpen={storageModalOpen}
+          onClose={() => setStorageModalOpen(false)}
+          clinicId={clinicId}
+          initialData={storageData}
+        />
+      )}
     </div>
   );
 }

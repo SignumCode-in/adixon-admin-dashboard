@@ -12,7 +12,8 @@ import {
   Eye, 
   FileCheck,
   Building2,
-  Printer
+  Printer,
+  Calendar
 } from 'lucide-react';
 
 const PRESET_COLORS = [
@@ -45,6 +46,10 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
   const [primaryColor, setPrimaryColor] = useState('#0F766E');
   const [fontSize, setFontSize] = useState('standard');
 
+  const [showDate, setShowDate] = useState(true);
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [customDate, setCustomDate] = useState('');
+
   const [showVitals, setShowVitals] = useState(true);
   const [showDiagnosis, setShowDiagnosis] = useState(true);
   const [showAdvice, setShowAdvice] = useState(true);
@@ -72,6 +77,9 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
           setHeaderMarginMm(t.header_margin_mm ?? 50);
           setPrimaryColor(t.primary_color || '#0F766E');
           setFontSize(t.font_size || 'standard');
+          setShowDate(t.show_date !== false);
+          setCustomDate(t.custom_date || '');
+          setUseCustomDate(Boolean(t.custom_date && t.custom_date.trim().length > 0));
           setShowVitals(t.show_vitals !== false);
           setShowDiagnosis(t.show_diagnosis !== false);
           setShowAdvice(t.show_advice !== false);
@@ -129,6 +137,8 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
       header_margin_mm: Number(headerMarginMm),
       primary_color: primaryColor,
       font_size: fontSize,
+      show_date: showDate,
+      custom_date: (showDate && useCustomDate) ? customDate.trim() : '',
       show_vitals: showVitals,
       show_diagnosis: showDiagnosis,
       show_advice: showAdvice,
@@ -189,7 +199,7 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
     if (typeof asset === 'object') return asset.secure_url || asset.url || '';
     return '';
   };
-  const logoUrl = resolveAsset(clinic?.logo) || resolveAsset(clinic?.profile_url);
+  const logoUrl = resolveAsset(clinic?.logo) || resolveAsset(clinic?.profile_url) || '/adixon-logo.png';
   const signatureUrl = resolveAsset(clinic?.doctor_signature);
   const stampUrl = resolveAsset(clinic?.stamp);
 
@@ -219,6 +229,7 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
     : (realConsent?.patient_id?.phone || '9988776655');
 
   const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const effectiveDate = (showDate && useCustomDate && customDate.trim()) ? customDate.trim() : todayStr;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -439,34 +450,126 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
+                { label: 'Document Date', desc: 'Show date on prescription and documents', state: showDate, setter: setShowDate },
                 { label: 'Next Visit / Follow-up Date', desc: 'Show scheduled return appointment date', state: showNextVisit, setter: setShowNextVisit },
                 { label: 'Doctor Signature', desc: 'Show digital signature block on output', state: showSignature, setter: setShowSignature },
                 { label: 'Clinic Stamp', desc: 'Display authorized clinic seal/stamp', state: showStamp, setter: setShowStamp },
                 { label: 'Clinic Footer Strip', desc: 'Show clinic info footer banner at the bottom', state: showFooter, setter: setShowFooter },
               ].map((item, idx) => (
-                <label 
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: 'var(--color-bg-secondary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: '12.5px', fontWeight: '500', color: 'var(--color-text)' }}>{item.label}</div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--color-text-secondary)' }}>{item.desc}</div>
-                  </div>
-                  <input 
-                    type="checkbox"
-                    checked={item.state}
-                    onChange={(e) => item.setter(e.target.checked)}
-                    style={{ width: '17px', height: '17px', accentColor: primaryColor, cursor: 'pointer' }}
-                  />
-                </label>
+                <div key={idx}>
+                  <label 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--color-bg-secondary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '12.5px', fontWeight: '500', color: 'var(--color-text)' }}>{item.label}</div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--color-text-secondary)' }}>{item.desc}</div>
+                    </div>
+                    <input 
+                      type="checkbox"
+                      checked={item.state}
+                      onChange={(e) => item.setter(e.target.checked)}
+                      style={{ width: '17px', height: '17px', accentColor: primaryColor, cursor: 'pointer' }}
+                    />
+                  </label>
+
+                  {/* Custom Date Override Sub-option under Document Date */}
+                  {item.label === 'Document Date' && showDate && (
+                    <div style={{
+                      marginTop: '6px',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border)',
+                      marginLeft: '6px'
+                    }}>
+                      <label 
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          marginBottom: useCustomDate ? '10px' : 0
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Calendar size={15} color={primaryColor} />
+                          <div>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text)' }}>
+                              Custom Date Override
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--color-text-secondary)' }}>
+                              {useCustomDate && customDate ? `Active: ${customDate}` : 'Use a specific date instead of default date'}
+                            </div>
+                          </div>
+                        </div>
+                        <input 
+                          type="checkbox"
+                          checked={useCustomDate}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setUseCustomDate(checked);
+                            if (checked && !customDate) {
+                              setCustomDate(todayStr);
+                            }
+                          }}
+                          style={{ width: '16px', height: '16px', accentColor: primaryColor, cursor: 'pointer' }}
+                        />
+                      </label>
+
+                      {useCustomDate && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                          <input 
+                            type="text"
+                            className="input"
+                            placeholder="e.g. 14 Sep 2026"
+                            value={customDate}
+                            onChange={(e) => setCustomDate(e.target.value)}
+                            style={{ flex: 1, fontSize: '12px', padding: '6px 10px', height: '34px' }}
+                          />
+                          <input 
+                            type="date"
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const d = new Date(e.target.value);
+                                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                const day = String(d.getDate()).padStart(2, '0');
+                                const month = months[d.getMonth()];
+                                const year = d.getFullYear();
+                                setCustomDate(`${day} ${month} ${year}`);
+                              }
+                            }}
+                            title="Pick date from calendar"
+                            style={{
+                              width: '38px',
+                              height: '34px',
+                              padding: '2px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              cursor: 'pointer',
+                              background: 'var(--color-bg-secondary)'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCustomDate(todayStr)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ height: '34px', fontSize: '11px', padding: '0 10px', whiteSpace: 'nowrap' }}
+                          >
+                            Today
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -628,7 +731,7 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
                       <img 
                         src={logoUrl} 
                         alt="Logo" 
-                        style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'cover' }} 
+                        style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'contain' }} 
                       />
                     ) : (
                       <div style={{
@@ -676,130 +779,138 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
                 </div>
               )}
 
-              {/* DOCUMENT TITLE */}
-              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '15px', fontWeight: 'bold', color: primaryColor, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>
-                  {docTab === 'prescription' ? 'PRESCRIPTION' 
-                    : docTab === 'certificate' ? (realCertificate?.certificate_type || 'MEDICAL CERTIFICATE')
-                    : (realConsent?.title || 'INFORMED CONSENT')}
-                </h2>
-                <div style={{ width: '50px', height: '2px', background: primaryColor, margin: '4px auto 0' }} />
-              </div>
-
-              {/* PATIENT BANNER */}
+              {/* PATIENT BANNER (Clean, Centered, No box) */}
               <div style={{ 
                 textAlign: 'center', 
-                fontSize: '11.5px', 
+                fontSize: '12px', 
                 color: '#475569', 
                 marginBottom: '16px',
-                background: '#F8FAFC',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0'
+                padding: '4px 0'
               }}>
-                <div>
-                  Patient : <strong style={{ color: '#0F172A', fontSize: '12px' }}>{samplePatientName}, {samplePatientMeta}</strong>
-                  <span style={{ margin: '0 8px' }}>•</span>
-                  <span>Date : <strong>{todayStr}</strong></span>
-                </div>
-                {(samplePatientAddress || samplePatientPhone) && (
-                  <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>
-                    {samplePatientAddress && <span>Address: {samplePatientAddress} </span>}
-                    {samplePatientPhone && <span>• Phone: {samplePatientPhone}</span>}
-                  </div>
-                )}
+                Patient : <strong style={{ color: '#0F172A', fontSize: '13px' }}>{samplePatientName}, {samplePatientMeta}</strong>
               </div>
 
               {/* 1. PRESCRIPTION PREVIEW */}
               {docTab === 'prescription' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1.35fr', gap: '20px' }}>
-                    {/* Left Column: Vitals, History, Diagnosis, Advice */}
-                    <div>
-                      {/* Vitals */}
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontWeight: 'bold', color: primaryColor, marginBottom: '4px', borderLeft: `3px solid ${primaryColor}`, paddingLeft: '6px' }}>
-                          Vitals
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                    {/* Left Column (flex: 1.05) */}
+                    <div style={{ flex: 1.05, paddingRight: '8px' }}>
+                      {/* Date */}
+                      {showDate && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A', fontWeight: '600' }}>
+                          Date : {effectiveDate}
                         </div>
-                        <div style={{ marginBottom: '2px' }}>BP : <strong>{realPrescription?.vitals?.blood_pressure || '120/80'}</strong> mmHg</div>
-                        <div style={{ marginBottom: '2px' }}>Pulse : <strong>{realPrescription?.vitals?.pulse_rate || '76'}</strong> bpm</div>
-                        <div style={{ marginBottom: '2px' }}>Temp : <strong>{realPrescription?.vitals?.temperature || '98.4'}</strong> °F</div>
-                        <div style={{ marginBottom: '2px' }}>SpO2 : <strong>{realPrescription?.vitals?.spo2 || '98'}</strong> %</div>
-                      </div>
+                      )}
+
+                      {showPatientAddress && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A' }}>
+                          Address : {samplePatientAddress}
+                        </div>
+                      )}
+
+                      {showPatientPhone && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A' }}>
+                          Phone : {samplePatientPhone}
+                        </div>
+                      )}
+
+                      {/* Vitals */}
+                      {showVitals && (
+                        <div style={{ marginTop: '6px' }}>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Temperature :</span> <span>25 ° F</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Height :</span> <span>125 cm</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Weight :</span> <span>10 kg</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Pulse :</span> <span>255 bpm</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>BP :</span> <span>545</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Blood Sugar :</span> <span>525 mg/dL</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Hemoglobin :</span> <span>14 g/dL</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>SpO2 :</span> <span>42 %</span></div>
+                          <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Respiration Rate :</span> <span>55 /min</span></div>
+                        </div>
+                      )}
 
                       {/* Clinical details */}
                       <div style={{ marginTop: '8px' }}>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong style={{ color: primaryColor }}>Chief Complaint:</strong> {realPrescription?.clinical?.chief_complaint || 'Mild fever and sore throat'}
-                        </div>
-                        <div style={{ marginBottom: '4px' }}>
-                          <strong style={{ color: primaryColor }}>Diagnosis:</strong> {realPrescription?.clinical?.diagnosis || 'Acute Upper Respiratory Infection'}
-                        </div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Allergies :</span> <span>{realPrescription?.clinical?.allergy || 'edfre wer frfga rtg fzxgwrtyytfry rsty rthy  byh ghh bgh na to I don\'t know what you think about it is not'}</span></div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Chief Complaint :</span> <span>{realPrescription?.clinical?.chief_complaint || 'ghar pe hi to I don\'t know what you'}</span></div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>History :</span> <span>{realPrescription?.clinical?.patient_history || 'thn ah ka kya hua tha ki baat nhi hai'}</span></div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Findings :</span> <span>{realPrescription?.clinical?.findings || 'gehri meng mrng me btw I\'m not sure'}</span></div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>Treatment/Advice :</span> <span>{realPrescription?.clinical?.treatment || 'rtuy rth  y'}</span></div>
+                        <div style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}><span style={{ fontWeight: '500' }}>End Note :</span> <span>{realPrescription?.clinical?.notes || 'fgh gf hj'}</span></div>
                       </div>
 
-                      {/* Advice / Labs */}
-                      {realPrescription?.labs && realPrescription.labs.length > 0 ? (
-                        <div style={{ marginTop: '10px' }}>
-                          <div style={{ fontWeight: 'bold', color: primaryColor, marginBottom: '3px' }}>Advice / Labs:</div>
-                          <ul style={{ margin: 0, paddingLeft: '16px' }}>
-                            {realPrescription.labs.map((l, i) => (
-                              <li key={i}>{typeof l === 'string' ? l : (l.name || l.lab_test)}</li>
-                            ))}
-                          </ul>
+                      {/* Diagnosis */}
+                      {showDiagnosis && (
+                        <div style={{ marginTop: '10px', marginBottom: '12px', fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
+                          Diagnosis : {realPrescription?.clinical?.diagnosis || 'Doctor diagnosis'}
                         </div>
-                      ) : (
-                        <div style={{ marginTop: '10px' }}>
-                          <div style={{ fontWeight: 'bold', color: primaryColor, marginBottom: '3px' }}>Advice:</div>
-                          <div style={{ fontSize: '10.5px' }}>- Complete Bed Rest for 3 Days</div>
-                          <div style={{ fontSize: '10.5px' }}>- Drink warm fluids & steam inhalation</div>
+                      )}
+
+                      {/* Advice / Labs */}
+                      {showAdvice && (
+                        <div style={{ marginTop: '14px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: primaryColor, marginBottom: '6px' }}>
+                            Advice
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: '#1E293B', marginBottom: '4px', paddingLeft: '4px' }}>
+                            - CBC with GBP, Blood Urea S. Creatinine, LFT urine R/M
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: '#1E293B', marginBottom: '4px', paddingLeft: '4px' }}>
+                            - CBC, ESR, CRP. RBS Serum Uric Acid.
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Right Column: Rx Medicines */}
-                    <div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: primaryColor, marginBottom: '10px', letterSpacing: '0.5px' }}>
-                        Rx (Medicines)
+                    {/* Right Column (flex: 1.35) */}
+                    <div style={{ flex: 1.35 }}>
+                      <div style={{ fontSize: '18px', fontWeight: '800', color: primaryColor, marginBottom: '14px', letterSpacing: '0.5px' }}>
+                        Rx
                       </div>
 
-                      {realPrescription?.medicines && realPrescription.medicines.length > 0 ? (
-                        realPrescription.medicines.map((m, idx) => (
-                          <div key={idx} style={{ marginBottom: '10px', borderBottom: '1px dashed #E2E8F0', paddingBottom: '6px' }}>
-                            <div style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
-                              {idx + 1}. {m.name} {m.quantity ? `(Qty: ${m.quantity})` : ''}
-                            </div>
-                            <div style={{ fontSize: '10.5px', color: '#334155' }}>
-                              {[m.frequency, m.instruction, m.no_of_days ? `for ${m.no_of_days} Days` : null].filter(Boolean).join(' • ')}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div>
-                          <div style={{ marginBottom: '10px', borderBottom: '1px dashed #E2E8F0', paddingBottom: '6px' }}>
-                            <div style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
-                              1. Amoxicillin 500mg (Qty: 10)
-                            </div>
-                            <div style={{ fontSize: '10.5px', color: '#334155' }}>
-                              Twice A Day (1-0-1) After Food for 5 Days
-                            </div>
-                          </div>
-                          <div style={{ marginBottom: '10px', borderBottom: '1px dashed #E2E8F0', paddingBottom: '6px' }}>
-                            <div style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
-                              2. Paracetamol 650mg (Qty: 6)
-                            </div>
-                            <div style={{ fontSize: '10.5px', color: '#334155' }}>
-                              SOS (As needed for fever) After Food
-                            </div>
-                          </div>
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '3px' }}>
+                          SINAREST AF Tablet (Qty: 14)
                         </div>
-                      )}
+                        <div style={{ fontSize: '10.5px', color: '#334155', marginBottom: '2px' }}>
+                          BD (Twice A Day / 1-0-1) for 7 Days
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '3px' }}>
+                          Pandostal-OD Capsule SR (Qty: 7)
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#334155', marginBottom: '2px' }}>
+                          OD (Once A Day / 1-0-0) Early Morning Empty Stomach for 1 Days
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '3px' }}>
+                          Pexep CR 25 Tablet (Qty: 10)
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#334155', marginBottom: '2px' }}>
+                          HS (Before Sleep / 0-0-1) for 10 Days
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '3px' }}>
+                          ZORYL MP 1 FORTE 1X10 (Qty: 1)
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#334155', marginBottom: '2px' }}>
+                          for 1 Days
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* NEXT VISIT */}
                   {showNextVisit && (
-                    <div style={{ marginTop: '18px', fontWeight: 'bold', fontSize: '11px', color: '#0F172A' }}>
-                      Next Follow-up Visit: {realPrescription?.follow_up_date ? new Date(realPrescription.follow_up_date).toLocaleDateString() : 'After 5 Days'}
+                    <div style={{ marginTop: '24px', marginBottom: '20px', fontSize: '11.5px', fontWeight: '700', color: '#0F172A' }}>
+                      Next Visit: 01 Sep 2026 - tg not a good time with my family is not a good
                     </div>
                   )}
                 </div>
@@ -808,6 +919,11 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
               {/* 2. CERTIFICATE PREVIEW */}
               {docTab === 'certificate' && (
                 <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#0F172A', marginTop: '12px' }}>
+                  {showDate && (
+                    <div style={{ fontSize: '11px', marginBottom: '8px', color: '#0F172A', fontWeight: '600' }}>
+                      Date : {effectiveDate}
+                    </div>
+                  )}
                   <div style={{ marginBottom: '14px', background: '#F1F5F9', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-block' }}>
                     Validity Duration: {realCertificate?.duration || '3 Days'}
                   </div>
@@ -825,6 +941,11 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
               {/* 3. CONSENT PREVIEW */}
               {docTab === 'consent' && (
                 <div style={{ fontSize: '12px', lineHeight: '1.75', color: '#0F172A', marginTop: '12px' }}>
+                  {showDate && (
+                    <div style={{ fontSize: '11px', marginBottom: '8px', color: '#0F172A', fontWeight: '600' }}>
+                      Date : {effectiveDate}
+                    </div>
+                  )}
                   <div style={{ whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
                     {realConsent?.content || 'I hereby give my informed authorization and consent to undergo the proposed medical procedure and clinical treatments. The risks and benefits have been clearly explained to me.'}
                   </div>
@@ -880,14 +1001,14 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
               <div style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
                   {/* Stamp */}
-                  <div style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '90px', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {showStamp && (
                       stampUrl ? (
-                        <img src={stampUrl} alt="Stamp" style={{ maxWidth: '70px', maxHeight: '70px', objectFit: 'contain' }} />
+                        <img src={stampUrl} alt="Stamp" style={{ maxWidth: '90px', maxHeight: '90px', objectFit: 'contain' }} />
                       ) : (
                         <div style={{
-                          width: '60px',
-                          height: '60px',
+                          width: '70px',
+                          height: '70px',
                           borderRadius: '50%',
                           border: `2px dashed ${primaryColor}60`,
                           display: 'flex',
@@ -905,19 +1026,17 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
 
                   {/* Signature */}
                   {showSignature && (
-                    <div style={{ textAlign: 'center', minWidth: '130px' }}>
+                    <div style={{ textAlign: 'center', minWidth: '150px' }}>
                       {signatureUrl ? (
-                        <img src={signatureUrl} alt="Doctor Signature" style={{ maxHeight: '38px', objectFit: 'contain', marginBottom: '2px' }} />
+                        <img src={signatureUrl} alt="Doctor Signature" style={{ maxWidth: '130px', maxHeight: '48px', objectFit: 'contain', marginBottom: '4px' }} />
                       ) : (
-                        <div style={{ height: '32px', color: '#94A3B8', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          Digital Signature
-                        </div>
+                        <div style={{ height: '36px' }} />
                       )}
-                      <div style={{ width: '120px', height: '1px', background: '#64748B', margin: '0 auto 4px auto' }} />
-                      <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0F172A' }}>
-                        {doctorName ? `Dr. ${doctorName}` : 'Attending Doctor'}
+                      <div style={{ width: '140px', height: '1px', background: '#64748B', margin: '0 auto 4px auto' }} />
+                      <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#0F172A' }}>
+                        {doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`}
                       </div>
-                      {doctorQual && <div style={{ fontSize: '9.5px', color: '#64748B' }}>{doctorQual}</div>}
+                      {doctorQual && <div style={{ fontSize: '10px', color: '#64748B' }}>{doctorQual}</div>}
                     </div>
                   )}
                 </div>
@@ -926,7 +1045,7 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
                 {showFooter && (
                   <div style={{
                     background: '#F1F5F9',
-                    padding: '6px 10px',
+                    padding: '7px 12px',
                     borderRadius: '4px',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -934,7 +1053,7 @@ export default function PdfTemplateStudio({ clinic, onSaveSuccess }) {
                     fontSize: '9.5px',
                     color: '#475569'
                   }}>
-                    <div>{clinicName} {clinicPhone && `• Contact: ${clinicPhone}`}</div>
+                    <div>{clinicName} {clinicPhone}</div>
                     <div>{footerText}</div>
                   </div>
                 )}

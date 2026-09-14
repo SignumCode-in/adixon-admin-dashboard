@@ -24,6 +24,10 @@ export default function ClinicGuard({ children }) {
 
   // If user is Master Admin, redirect to their dedicated Admin portal
   if (user.role === 'admin') {
+    if (location.pathname.startsWith('/patients/')) {
+      const patientId = location.pathname.replace('/patients/', '');
+      return <Navigate to={`/admin/patients/${patientId}`} replace />;
+    }
     return <Navigate to="/admin/dashboard" replace />;
   }
 

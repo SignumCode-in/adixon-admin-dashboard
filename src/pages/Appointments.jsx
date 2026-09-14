@@ -3,11 +3,13 @@ import { appointmentAPI, patientAPI, userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { Calendar, PlusCircle, Search, Clock, User, ArrowLeft, Trash2, Edit2 } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
+import { Calendar, PlusCircle, Search, Clock, User, ArrowLeft, Trash2, Edit2, Stethoscope, Building } from 'lucide-react';
 
 export default function Appointments() {
   const { user } = useAuth();
   const activeClinicId = useActiveClinicScope();
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_appts') || 'list');
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -39,7 +41,7 @@ export default function Appointments() {
     setLoading(true);
     setError('');
     try {
-      const queryParams = { limit: 100 };
+      const queryParams = { limit: 1000 };
       if (activeClinicId && activeClinicId !== 'all') {
         queryParams.clinic_id = activeClinicId;
       }
@@ -278,8 +280,8 @@ export default function Appointments() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
             className="input-field"
@@ -290,14 +292,80 @@ export default function Appointments() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle 
+          mode={displayMode} 
+          onChange={(m) => {
+            setDisplayMode(m);
+            localStorage.setItem('adixon_view_mode_appts', m);
+          }} 
+        />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading schedule slots...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No appointments scheduled.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading schedule slots...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No appointments scheduled.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((a) => (
+            <div key={a._id} className="record-card">
+              <div className="record-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    {(a.patient_id?.full_name || 'W').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {a.patient_id?.full_name || 'Walk-in Patient'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                      {a.patient_id?.phone || 'No phone'}
+                    </div>
+                  </div>
+                </div>
+                <span className={`badge ${getStatusBadge(a.status)}`} style={{ fontSize: '11px' }}>
+                  {a.status}
+                </span>
+              </div>
+
+              <div className="record-card-body">
+                <div className="record-card-row">
+                  <Stethoscope size={14} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                  <span>Doctor: <strong>{a.doctor_id?.full_name || 'Duty Doctor'}</strong></span>
+                </div>
+                <div className="record-card-row">
+                  <Building size={14} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                  <span>Clinic: {a.clinic_id?.name || 'Shared Core'}</span>
+                </div>
+                <div className="record-card-row">
+                  <Clock size={14} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+                  <span>Date & Time: {new Date(a.date).toLocaleDateString()} at {a.time}</span>
+                </div>
+                {a.notes && (
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', padding: '6px 8px', borderRadius: '6px', marginTop: '4px' }}>
+                    💬 {a.notes}
+                  </div>
+                )}
+              </div>
+
+              <div className="record-card-footer">
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                  ID: {a._id.slice(-6)}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px' }} onClick={() => handleOpenEdit(a)}>
+                    <Edit2 size={12} /> Edit
+                  </button>
+                  <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} onClick={() => triggerDelete(a._id)}>
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -347,8 +415,8 @@ export default function Appointments() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal

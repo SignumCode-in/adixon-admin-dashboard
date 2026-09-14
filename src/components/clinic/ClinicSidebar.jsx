@@ -40,42 +40,62 @@ export default function ClinicSidebar({ isCollapsed, onToggleCollapse, isMobileO
     {
       title: 'Clinical Care',
       items: [
-        { title: 'Dashboard', path: '/dashboard', icon: <Layout size={18} /> },
-        { title: 'Patients & EHR', path: '/patients', icon: <UserCheck size={18} />, permission: 'patients' },
-        { title: 'Appointments', path: '/appointments', icon: <CalendarDays size={18} />, permission: 'appointments' },
-        { title: 'Prescriptions', path: '/prescriptions', icon: <FileSpreadsheet size={18} />, permission: 'prescriptions' },
+        { title: 'Dashboard', path: '/dashboard', icon: <Layout size={18} />, moduleKey: 'dashboard' },
+        { title: 'Patients & EHR', path: '/patients', icon: <UserCheck size={18} />, permission: 'patients', moduleKey: 'patients' },
+        { title: 'Appointments', path: '/appointments', icon: <CalendarDays size={18} />, permission: 'appointments', moduleKey: 'appointments' },
+        { title: 'Prescriptions', path: '/prescriptions', icon: <FileSpreadsheet size={18} />, permission: 'prescriptions', moduleKey: 'prescriptions' },
       ]
     },
     {
       title: 'Medical Assets & Tests',
       items: [
-        { title: 'Medicines & Stock', path: '/medicines', icon: <Pill size={18} />, permission: 'medicines' },
-        { title: 'Labs & Diagnostics', path: '/labs', icon: <FlaskConical size={18} />, permission: 'labs' },
-        { title: 'Medical Certificates', path: '/certificates', icon: <FileBadge size={18} />, permission: 'certificates' },
-        { title: 'Patient Instructions', path: '/instructions', icon: <FileText size={18} />, permission: 'instructions' },
-        { title: 'Consent Forms', path: '/consents', icon: <ClipboardCheck size={18} />, permission: 'consents' },
-        { title: 'Templates', path: '/templates', icon: <Layout size={18} />, permission: 'templates' },
+        { title: 'Medicines & Stock', path: '/medicines', icon: <Pill size={18} />, permission: 'medicines', moduleKey: 'medicines' },
+        { title: 'Medical Certificates', path: '/certificates', icon: <FileBadge size={18} />, permission: 'certificates', moduleKey: 'certificates' },
+        { title: 'Patient Instructions', path: '/instructions', icon: <FileText size={18} />, permission: 'instructions', moduleKey: 'instructions' },
+        { title: 'Consent Forms', path: '/consents', icon: <ClipboardCheck size={18} />, permission: 'consents', moduleKey: 'consents' },
+        { title: 'Templates', path: '/templates', icon: <Layout size={18} />, permission: 'templates', moduleKey: 'templates' },
       ]
     },
     {
       title: 'Clinic Administration',
       items: [
-        { title: 'Clinic Staff', path: '/users', icon: <Users size={18} />, doctorOnly: true },
-        { title: 'Clinic Settings', path: '/settings', icon: <Settings size={18} /> },
+        { title: 'Clinic Staff', path: '/users', icon: <Users size={18} />, doctorOnly: true, moduleKey: 'staff_management' },
+        { title: 'Clinic Settings', path: '/settings', icon: <Settings size={18} />, doctorOnly: true, moduleKey: 'clinic_settings' },
       ]
     }
   ];
 
-  // Filter sections by Doctor role or Staff permissions
+  const adminSettings = user?.clinic_id?.admin_settings;
+  const enabledModules = adminSettings?.enabled_modules;
+  const staffSectionAccess = adminSettings?.staff_section_access;
+
+  // Filter sections by Clinic administration settings, Doctor role, and Staff permissions
   const filteredSections = clinicSections.map(section => ({
     ...section,
     items: section.items.filter(item => {
-      if (isDoctor) return true;
-      if (item.doctorOnly) return false;
-      if (!item.permission) return true;
-      return hasPermission(item.permission);
+      // 1. If module is disabled globally for this clinic by Administration, hide it
+      if (item.moduleKey && enabledModules && enabledModules[item.moduleKey] === false) {
+        return false;
+      }
+      
+      // 2. If user is Staff (not doctor): check if staff is allowed to see this section
+      if (!isDoctor) {
+        if (item.doctorOnly && (!staffSectionAccess || !staffSectionAccess[item.moduleKey])) {
+          return false;
+        }
+        if (item.moduleKey && staffSectionAccess && staffSectionAccess[item.moduleKey] === false) {
+          return false;
+        }
+        if (item.permission && !hasPermission(item.permission)) {
+          return false;
+        }
+      }
+
+      return true;
     })
   })).filter(section => section.items.length > 0);
+
+  const clinicLogo = user?.clinic_id?.logo || user?.clinic_id?.profile_url;
 
   return (
     <>
@@ -93,10 +113,30 @@ export default function ClinicSidebar({ isCollapsed, onToggleCollapse, isMobileO
         />
       )}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} style={{ zIndex: 100 }}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo" style={{ background: 'linear-gradient(135deg, #0d9488, #2563eb)' }}>
-            <Stethoscope size={18} style={{ color: '#ffffff' }} />
-          </div>
+        <div className="sidebar-header" style={{ padding: isCollapsed ? '16px 8px' : '14px 16px' }}>
+          {clinicLogo ? (
+            <img 
+              src={clinicLogo} 
+              alt={clinicName} 
+              onError={(e) => { e.currentTarget.src = '/adixon-logo.png'; }}
+              style={{ 
+                height: isCollapsed ? '28px' : '34px', 
+                maxWidth: isCollapsed ? '36px' : '60px', 
+                objectFit: 'contain',
+                borderRadius: '6px'
+              }} 
+            />
+          ) : (
+            <img 
+              src="/adixon-logo.png" 
+              alt="Adixon Clinic OS" 
+              style={{ 
+                height: isCollapsed ? '22px' : '28px', 
+                maxWidth: isCollapsed ? '34px' : '95px', 
+                objectFit: 'contain' 
+              }} 
+            />
+          )}
           {!isCollapsed && (
             <div className="sidebar-brand-wrapper">
               <span className="sidebar-brand" title={clinicName}>{clinicName}</span>

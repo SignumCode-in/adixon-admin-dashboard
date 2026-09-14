@@ -3,6 +3,21 @@ import { X, Printer, Download, Sparkles } from 'lucide-react';
 import { prescriptionAPI, certificateAPI, consentAPI, clinicAPI } from '../services/api';
 import { useClinic } from '../context/ClinicContext';
 
+function formatDate(date) {
+  if (!date) return '';
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch (_) {
+    return String(date);
+  }
+}
+
 function calculateAge(dob) {
   if (!dob) return '';
   try {
@@ -52,7 +67,7 @@ export default function PdfPreviewModal({
             setLiveTemplate(res.data);
           }
         })
-        .catch(() => { });
+        .catch(() => {});
     }
   }, [isOpen, resolvedClinic?._id, clinic, data, clinicCtx?.selectedClinicId]);
 
@@ -63,6 +78,8 @@ export default function PdfPreviewModal({
   const headerMarginMm = Number(activeTemplate.header_margin_mm) || 50;
   const primaryColor = activeTemplate.primary_color || '#0F766E';
 
+  const showDate = activeTemplate.show_date !== false;
+  const customDate = activeTemplate.custom_date ? String(activeTemplate.custom_date).trim() : '';
   const showVitals = activeTemplate.show_vitals !== false;
   const showDiagnosis = activeTemplate.show_diagnosis !== false;
   const showAdvice = activeTemplate.show_advice !== false;
@@ -86,8 +103,8 @@ export default function PdfPreviewModal({
     ? doctor
     : (data.doctor_id && typeof data.doctor_id === 'object' ? data.doctor_id : {});
 
-  const doctorName = resolvedDoctor.full_name || resolvedDoctor.name || resolvedClinic.doctor_name || '';
-  const doctorQualification = resolvedDoctor.qualification || resolvedClinic.doctor_qualification || '';
+  const doctorName = resolvedDoctor.full_name || resolvedDoctor.name || resolvedClinic.doctor_name || 'Doctor';
+  const doctorQualification = resolvedDoctor.qualification || resolvedClinic.doctor_qualification || 'MBBS';
   const doctorReg = resolvedDoctor.registration_number || resolvedClinic.registration_number || '';
   const signatureUrl = resolvedDoctor.signature_url || resolveAsset(resolvedDoctor.signature) || resolveAsset(resolvedClinic.doctor_signature) || resolvedClinic.doctor_signature_url || '';
 
@@ -102,32 +119,69 @@ export default function PdfPreviewModal({
   const patientAddress = resolvedPatient.address || data.patient_address || '';
   const patientPhone = resolvedPatient.phone || data.patient_phone || '';
 
-  const patientMeta = [
-    patientGender,
-    patientAge ? `${patientAge} Yrs` : null,
-  ].filter(Boolean).join(' / ');
+  let genderAgeStr = '';
+  if (patientGender && patientAge) {
+    genderAgeStr = `, ${patientGender} / ${patientAge} Yrs`;
+  } else if (patientGender) {
+    genderAgeStr = `, ${patientGender}`;
+  } else if (patientAge) {
+    genderAgeStr = ` / ${patientAge} Yrs`;
+  }
 
   // Resolve Clinic Info (Real data from clinic or clinicCtx)
-  const clinicName = resolvedClinic.name || resolvedClinic.clinicName || '';
-  const tagline = resolvedClinic.tagline || '';
+  const clinicName = resolvedClinic.name || resolvedClinic.clinicName || 'Clinic';
   const clinicAddress = resolvedClinic.address || '';
   const clinicPhone = resolvedClinic.phone || '';
   const clinicEmail = resolvedClinic.email || '';
-  const clinicWebsite = resolvedClinic.website || '';
-  const visitingHours = resolvedClinic.visit_hours || resolvedClinic.visitingHours || '';
-  const openDays = resolvedClinic.open_days || resolvedClinic.openDays || '';
 
-  const logoUrl = resolvedClinic.logo_url || resolvedClinic.logoUrl || resolveAsset(resolvedClinic.logo) || resolveAsset(resolvedClinic.profile_url) || '';
+  const logoUrl = resolvedClinic.logo_url || resolvedClinic.logoUrl || resolveAsset(resolvedClinic.logo) || resolveAsset(resolvedClinic.profile_url) || '/adixon-logo.png';
   const stampUrl = resolveAsset(resolvedClinic.stamp) || resolvedClinic.stamp_url || resolvedClinic.stampUrl || '';
 
-  const issueDate = data.createdAt
-    ? new Date(data.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const visitDate = formatDate(data.visit_date || data.createdAt);
+  const issueDate = formatDate(data.issue_date || data.createdAt);
+  const dateToShow = customDate || issueDate || visitDate || formatDate(new Date());
+
+  // Vitals
+  const vitals = data.vitals || {};
+  const vitalsList = [];
+  if (showVitals) {
+    if (vitals.temperature) vitalsList.push({ label: 'Temperature', val: `${vitals.temperature} ° F` });
+    if (vitals.height) vitalsList.push({ label: 'Height', val: `${vitals.height} cm` });
+    if (vitals.weight) vitalsList.push({ label: 'Weight', val: `${vitals.weight} kg` });
+    if (vitals.pulse_rate) vitalsList.push({ label: 'Pulse', val: `${vitals.pulse_rate} bpm` });
+    if (vitals.blood_pressure) vitalsList.push({ label: 'BP', val: vitals.blood_pressure });
+    if (vitals.blood_sugar) vitalsList.push({ label: 'Blood Sugar', val: `${vitals.blood_sugar} mg/dL` });
+    if (vitals.hemoglobin) vitalsList.push({ label: 'Hemoglobin', val: `${vitals.hemoglobin} g/dL` });
+    if (vitals.spo2) vitalsList.push({ label: 'SpO2', val: `${vitals.spo2} %` });
+    if (vitals.respiration_rate) vitalsList.push({ label: 'Respiration Rate', val: `${vitals.respiration_rate} /min` });
+  }
+
+  // Clinical Details
+  const clinical = data.clinical || {};
+  const clinicalNotes = [];
+  if (clinical.allergy) clinicalNotes.push({ label: 'Allergies', val: clinical.allergy });
+  if (clinical.chief_complaint) clinicalNotes.push({ label: 'Chief Complaint', val: clinical.chief_complaint });
+  if (clinical.patient_history) clinicalNotes.push({ label: 'History', val: clinical.patient_history });
+  if (clinical.findings) clinicalNotes.push({ label: 'Findings', val: clinical.findings });
+  if (clinical.treatment) clinicalNotes.push({ label: 'Treatment/Advice', val: clinical.treatment });
+  if (clinical.notes) clinicalNotes.push({ label: 'End Note', val: clinical.notes });
+
+  const diagnosis = clinical.diagnosis || data.diagnosis || '';
+  const labs = data.labs || [];
+  const medicines = data.medicines || [];
 
   // Follow-up Date formatting for Next Visit
-  const followUpDateStr = data.follow_up_date
-    ? new Date(data.follow_up_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    : (data.clinical?.follow_up_date ? new Date(data.clinical.follow_up_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
+  const followUpDate = data.follow_up_date 
+    ? formatDate(data.follow_up_date)
+    : (data.clinical?.follow_up_date ? formatDate(data.clinical.follow_up_date) : '');
+  const followUpTime = data.clinical?.follow_up_time || '';
+  const followUpPurpose = data.clinical?.follow_up_purpose || '';
+  let followUpText = '';
+  if (followUpDate) {
+    followUpText = `Next Visit: ${followUpDate}`;
+    if (followUpTime) followUpText += ` at ${followUpTime}`;
+    if (followUpPurpose) followUpText += ` - ${followUpPurpose}`;
+  }
 
   const handleDownloadServerPdf = async () => {
     if (!data._id) return;
@@ -163,7 +217,7 @@ export default function PdfPreviewModal({
   const handlePrint = () => {
     const printContent = printRef.current.innerHTML;
     const printWindow = window.open('', '_blank', 'width=900,height=1000');
-
+    
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -172,7 +226,7 @@ export default function PdfPreviewModal({
           <style>
             @page {
               size: A4;
-              margin: 14mm 18mm 14mm 18mm;
+              margin: 12mm 16mm 14mm 16mm;
             }
             * {
               box-sizing: border-box;
@@ -232,15 +286,15 @@ export default function PdfPreviewModal({
 
   return (
     <div className="right-drawer-backdrop" onClick={onClose} style={{ zIndex: 1000 }}>
-      <div
-        className="card"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          maxWidth: '850px',
-          width: '92%',
-          maxHeight: '94vh',
-          display: 'flex',
-          flexDirection: 'column',
+      <div 
+        className="card" 
+        onClick={(e) => e.stopPropagation()} 
+        style={{ 
+          maxWidth: '850px', 
+          width: '92%', 
+          maxHeight: '94vh', 
+          display: 'flex', 
+          flexDirection: 'column', 
           borderRadius: '16px',
           overflow: 'hidden',
           padding: 0
@@ -261,8 +315,8 @@ export default function PdfPreviewModal({
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {data._id && (
-              <button
-                className="btn btn-secondary"
+              <button 
+                className="btn btn-secondary" 
                 onClick={handleDownloadServerPdf}
                 disabled={downloadingServerPdf}
                 style={{ padding: '6px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -281,18 +335,18 @@ export default function PdfPreviewModal({
 
         {/* Scrollable Document Container */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: '#525659', display: 'flex', justifyContent: 'center' }}>
-          {/* Paper A4 Container (Identical to PdfTemplateStudio & Puppeteer PDF) */}
-          <div
+          {/* Paper A4 Container (Identical to Puppeteer PDF Layout) */}
+          <div 
             ref={printRef}
-            style={{
-              width: '100%',
-              maxWidth: '720px',
-              minHeight: '920px',
-              background: '#FFFFFF',
-              padding: '28px 32px',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+            style={{ 
+              width: '100%', 
+              maxWidth: '720px', 
+              minHeight: '920px', 
+              background: '#FFFFFF', 
+              padding: '28px 32px', 
+              boxShadow: '0 8px 30px rgba(0,0,0,0.3)', 
               borderRadius: '2px',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
               color: '#0F172A',
               boxSizing: 'border-box',
               display: 'flex',
@@ -305,7 +359,7 @@ export default function PdfPreviewModal({
             <div>
               {/* TOP HEADER SECTION (Digital vs Letterhead Mode) */}
               {headerMode === 'letterhead' ? (
-                <div
+                <div 
                   className="letterhead-placeholder"
                   style={{
                     height: `${headerMarginMm * 3.78}px`,
@@ -324,27 +378,27 @@ export default function PdfPreviewModal({
                   Pre-Printed Letterhead Reserved Space ({headerMarginMm} mm)
                 </div>
               ) : (
-                <div style={{
+                <div style={{ 
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                  borderBottom: `2px solid ${primaryColor}`,
+                  borderBottom: '1.5px solid #E2E8F0',
                   paddingBottom: '12px',
                   marginBottom: '14px'
                 }}>
                   {/* Doctor Info (Left) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'cover' }} />
+                      <img src={logoUrl} alt="Clinic Logo" style={{ width: '72px', height: '72px', borderRadius: '10px', objectFit: 'contain' }} />
                     ) : (
-                      <div style={{ width: '64px', height: '64px', background: primaryColor, color: '#fff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+                      <div style={{ width: '72px', height: '72px', background: primaryColor, color: '#fff', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>
                         Dr
                       </div>
                     )}
                     <div>
-                      <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 2px', color: '#0F172A' }}>
-                        {doctorName ? `Dr. ${doctorName}` : 'Doctor'}
-                      </h3>
+                      <h2 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 2px', color: '#0F172A' }}>
+                        {doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`}
+                      </h2>
                       {doctorQualification && (
                         <div style={{ fontSize: '11px', color: '#475569', marginBottom: '2px' }}>{doctorQualification}</div>
                       )}
@@ -358,208 +412,203 @@ export default function PdfPreviewModal({
 
                   {/* Clinic Info (Right) */}
                   <div style={{ textAlign: 'right', fontSize: '10px', color: '#475569', lineHeight: '1.4' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>{clinicName || 'Adixon Clinic'}</div>
-                    {tagline && <div style={{ fontStyle: 'italic', marginBottom: '2px' }}>{tagline}</div>}
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A', marginBottom: '2px' }}>{clinicName}</div>
                     {clinicAddress && <div>{clinicAddress}</div>}
-                    {visitingHours && <div>Visiting Hours: {visitingHours}</div>}
-                    {openDays && <div>Open: {openDays}</div>}
                     {clinicPhone && <div>Contact: {clinicPhone}</div>}
                     {clinicEmail && <div>Mail: {clinicEmail}</div>}
-                    {clinicWebsite && <div>{clinicWebsite}</div>}
                   </div>
                 </div>
               )}
 
-              {/* DOCUMENT TITLE HEADER */}
-              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '15px', fontWeight: 'bold', color: primaryColor, textTransform: 'uppercase', letterSpacing: '1.5px', margin: 0 }}>
-                  {type === 'prescription' ? 'PRESCRIPTION'
-                    : type === 'certificate' ? (data.certificate_type || 'MEDICAL CERTIFICATE')
-                      : type === 'instruction' ? (data.title || 'PATIENT INSTRUCTION')
-                        : (data.title || 'INFORMED CONSENT')}
-                </h2>
-                <div style={{ width: '50px', height: '2px', background: primaryColor, margin: '4px auto 0' }} />
-              </div>
-
-              {/* PATIENT BANNER */}
-              <div style={{
-                textAlign: 'center',
-                fontSize: '11.5px',
-                color: '#475569',
+              {/* PATIENT BANNER (Clean, Centered, No box) */}
+              <div style={{ 
+                textAlign: 'center', 
+                fontSize: '12px', 
+                color: '#475569', 
                 marginBottom: '16px',
-                background: '#F8FAFC',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0'
+                padding: '4px 0'
               }}>
-                <div>
-                  Patient : <strong style={{ color: '#0F172A', fontSize: '12px' }}>{patientName}{patientMeta ? `, ${patientMeta}` : ''}</strong>
-                  <span style={{ margin: '0 8px' }}>•</span>
-                  <span>Date : <strong>{issueDate}</strong></span>
-                </div>
-                {(showPatientAddress && patientAddress || showPatientPhone && patientPhone) && (
-                  <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>
-                    {showPatientAddress && patientAddress && <span>Address: {patientAddress} </span>}
-                    {showPatientPhone && patientPhone && <span>• Phone: {patientPhone}</span>}
-                  </div>
-                )}
+                Patient : <strong style={{ color: '#0F172A', fontSize: '13px' }}>{patientName}{genderAgeStr}</strong>
               </div>
 
-              {/* 1. PRESCRIPTION SPECIFIC BODY (2 COLUMN LAYOUT) */}
+              {/* 1. PRESCRIPTION BODY */}
               {type === 'prescription' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1.35fr', gap: '20px' }}>
-                    {/* Left Column: Vitals & History */}
-                    <div>
-                      {/* Vitals */}
-                      {showVitals && data.vitals && (
-                        <div style={{ marginBottom: '12px' }}>
-                          <div style={{ fontWeight: 'bold', color: primaryColor, marginBottom: '4px', borderLeft: `3px solid ${primaryColor}`, paddingLeft: '6px' }}>
-                            Vitals
-                          </div>
-                          {data.vitals.blood_pressure && <div style={{ marginBottom: '2px' }}>BP : <strong>{data.vitals.blood_pressure}</strong> mmHg</div>}
-                          {data.vitals.pulse_rate && <div style={{ marginBottom: '2px' }}>Pulse : <strong>{data.vitals.pulse_rate}</strong> bpm</div>}
-                          {data.vitals.temperature && <div style={{ marginBottom: '2px' }}>Temp : <strong>{data.vitals.temperature}</strong> °F</div>}
-                          {data.vitals.spo2 && <div style={{ marginBottom: '2px' }}>SpO2 : <strong>{data.vitals.spo2}</strong> %</div>}
-                          {data.vitals.weight && <div style={{ marginBottom: '2px' }}>Weight : <strong>{data.vitals.weight}</strong> kg</div>}
-                          {data.vitals.height && <div style={{ marginBottom: '2px' }}>Height : <strong>{data.vitals.height}</strong> cm</div>}
-                          {data.vitals.blood_sugar && <div style={{ marginBottom: '2px' }}>Blood Sugar : <strong>{data.vitals.blood_sugar}</strong> mg/dL</div>}
-                          {data.vitals.hemoglobin && <div style={{ marginBottom: '2px' }}>Hemoglobin : <strong>{data.vitals.hemoglobin}</strong> g/dL</div>}
-                          {data.vitals.respiration_rate && <div style={{ marginBottom: '2px' }}>Respiration : <strong>{data.vitals.respiration_rate}</strong> /min</div>}
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                    {/* Left Column (flex: 1.05) */}
+                    <div style={{ flex: 1.05, paddingRight: '8px' }}>
+                      {showDate && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A', fontWeight: '600' }}>
+                          Date : {dateToShow}
                         </div>
                       )}
 
-                      {/* Clinical details */}
-                      {data.clinical && (
+                      {showPatientAddress && patientAddress && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A' }}>
+                          Address : {patientAddress}
+                        </div>
+                      )}
+
+                      {showPatientPhone && patientPhone && (
+                        <div style={{ fontSize: '11px', marginBottom: '5px', color: '#0F172A' }}>
+                          Phone : {patientPhone}
+                        </div>
+                      )}
+
+                      {/* Vitals */}
+                      {showVitals && vitalsList.length > 0 && (
+                        <div style={{ marginTop: '6px' }}>
+                          {vitalsList.map((v, idx) => (
+                            <div key={idx} style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}>
+                              <span style={{ fontWeight: '500' }}>{v.label} :</span> <span>{v.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Clinical Details */}
+                      {clinicalNotes.length > 0 && (
                         <div style={{ marginTop: '8px' }}>
-                          {data.clinical.allergy && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Allergies:</strong> {data.clinical.allergy}
+                          {clinicalNotes.map((c, idx) => (
+                            <div key={idx} style={{ fontSize: '11px', marginBottom: '4px', color: '#0F172A' }}>
+                              <span style={{ fontWeight: '500' }}>{c.label} :</span> <span>{c.val}</span>
                             </div>
-                          )}
-                          {data.clinical.chief_complaint && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Chief Complaint:</strong> {data.clinical.chief_complaint}
-                            </div>
-                          )}
-                          {data.clinical.patient_history && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Patient History:</strong> {data.clinical.patient_history}
-                            </div>
-                          )}
-                          {data.clinical.findings && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Findings:</strong> {data.clinical.findings}
-                            </div>
-                          )}
-                          {data.clinical.treatment && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Treatment/Advice:</strong> {data.clinical.treatment}
-                            </div>
-                          )}
-                          {data.clinical.notes && (
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong style={{ color: primaryColor }}>Notes:</strong> {data.clinical.notes}
-                            </div>
-                          )}
+                          ))}
                         </div>
                       )}
 
                       {/* Diagnosis */}
-                      {showDiagnosis && data.clinical?.diagnosis && (
-                        <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: 'bold', color: '#0F172A' }}>
-                          Diagnosis : {data.clinical.diagnosis}
+                      {showDiagnosis && diagnosis && (
+                        <div style={{ marginTop: '10px', marginBottom: '12px', fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
+                          Diagnosis : {diagnosis}
                         </div>
                       )}
 
                       {/* Advice / Labs */}
-                      {showAdvice && data.labs && data.labs.length > 0 && (
-                        <div style={{ marginTop: '12px' }}>
-                          <div style={{ fontWeight: 'bold', color: primaryColor, marginBottom: '4px' }}>Advice / Labs:</div>
-                          <ul style={{ margin: 0, paddingLeft: '16px' }}>
-                            {data.labs.map((l, lIdx) => (
-                              <li key={lIdx} style={{ marginBottom: '2px' }}>{typeof l === 'string' ? l : (l.name || l.lab_test)}</li>
-                            ))}
-                          </ul>
+                      {showAdvice && labs.length > 0 && (
+                        <div style={{ marginTop: '14px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: primaryColor, marginBottom: '6px' }}>
+                            Advice
+                          </div>
+                          {labs.map((l, idx) => (
+                            <div key={idx} style={{ fontSize: '10.5px', color: '#1E293B', marginBottom: '4px', paddingLeft: '4px' }}>
+                              - {typeof l === 'string' ? l : (l.name || l.lab_test)}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
 
-                    {/* Right Column: Rx Medicines & Next Visit */}
-                    <div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: primaryColor, marginBottom: '10px', letterSpacing: '0.5px' }}>
-                        Rx (Medicines)
+                    {/* Right Column (flex: 1.35) */}
+                    <div style={{ flex: 1.35 }}>
+                      <div style={{ fontSize: '18px', fontWeight: '800', color: primaryColor, marginBottom: '14px', letterSpacing: '0.5px' }}>
+                        Rx
                       </div>
 
-                      {data.medicines && data.medicines.length > 0 ? (
-                        data.medicines.map((m, idx) => (
-                          <div key={idx} style={{ marginBottom: '10px', borderBottom: '1px dashed #E2E8F0', paddingBottom: '6px' }}>
-                            <div style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#0F172A', marginBottom: '2px' }}>
-                              {idx + 1}. {m.name} {m.quantity ? `(Qty: ${m.quantity})` : ''}
-                            </div>
-                            <div style={{ fontSize: '10.5px', color: '#334155' }}>
-                              {[m.frequency, m.instruction, m.no_of_days ? `for ${m.no_of_days} Days` : null, m.route ? `(${m.route})` : null].filter(Boolean).join(' • ')}
-                            </div>
-                            {m.additional_comments && (
-                              <div style={{ fontStyle: 'italic', fontSize: '10px', color: '#64748B', marginTop: '2px' }}>
-                                Note: {m.additional_comments}
+                      {medicines && medicines.length > 0 ? (
+                        medicines.map((m, idx) => {
+                          const qtyStr = m.quantity ? ` (Qty: ${m.quantity})` : '';
+                          const details = [
+                            m.frequency,
+                            m.instruction,
+                            m.no_of_days ? `for ${m.no_of_days} Days` : '',
+                            m.route ? `(Route: ${m.route})` : '',
+                          ].filter(Boolean).join(' ');
+
+                          return (
+                            <div key={idx} style={{ marginBottom: '14px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A', marginBottom: '3px' }}>
+                                {m.name}{qtyStr}
                               </div>
-                            )}
-                          </div>
-                        ))
+                              {details && (
+                                <div style={{ fontSize: '10.5px', color: '#334155', marginBottom: '2px' }}>
+                                  {details}
+                                </div>
+                              )}
+                              {m.additional_comments && (
+                                <div style={{ fontSize: '10px', color: '#64748B', fontStyle: 'italic' }}>
+                                  Note: {m.additional_comments}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
                       ) : (
                         <div style={{ color: '#94A3B8', fontStyle: 'italic' }}>No medicines prescribed</div>
                       )}
-
-                      {/* Next Visit */}
-                      {showNextVisit && followUpDateStr && (
-                        <div style={{ marginTop: '20px', fontWeight: 'bold', fontSize: '11px', color: '#0F172A' }}>
-                          Next Follow-up Visit: {followUpDateStr}
-                        </div>
-                      )}
                     </div>
                   </div>
+
+                  {/* Next Visit */}
+                  {showNextVisit && followUpText && (
+                    <div style={{ marginTop: '24px', marginBottom: '20px', fontSize: '11.5px', fontWeight: '700', color: '#0F172A' }}>
+                      {followUpText}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* 2. CERTIFICATE SPECIFIC */}
+              {/* 2. CERTIFICATE BODY */}
               {type === 'certificate' && (
-                <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#0F172A', marginTop: '12px' }}>
-                  {data.duration && (
-                    <div style={{ marginBottom: '14px', background: '#F1F5F9', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', display: 'inline-block' }}>
-                      Duration / Leave: {data.duration}
+                <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#0F172A', marginTop: '16px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '15px', fontWeight: '700', color: primaryColor, textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                      {data.certificate_type || 'MEDICAL CERTIFICATE'}
+                    </h2>
+                  </div>
+
+                  {showDate && (
+                    <div style={{ fontSize: '11px', marginBottom: '8px', color: '#0F172A', fontWeight: '600' }}>
+                      Date : {dateToShow}
                     </div>
                   )}
 
-                  <div style={{ whiteSpace: 'pre-wrap', marginBottom: '16px' }}>
-                    {data.content || 'This is to certify that the patient has been examined and advised recovery rest.'}
+                  {data.duration && (
+                    <div style={{ marginBottom: '14px', background: '#F1F5F9', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
+                      Duration / Leave : {data.duration}
+                    </div>
+                  )}
+
+                  <div style={{ whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
+                    {data.content || 'This is to certify that the patient was examined at our clinic and advised recovery rest.'}
                   </div>
 
                   {data.remark && (
-                    <div style={{ marginTop: '14px', borderLeft: `3px solid ${primaryColor}`, paddingLeft: '10px', fontStyle: 'italic', color: '#475569' }}>
-                      <strong>Clinical Remarks:</strong> {data.remark}
+                    <div style={{ marginTop: '16px', borderLeft: `3px solid ${primaryColor}`, paddingLeft: '10px', fontStyle: 'italic', color: '#475569' }}>
+                      <strong>Remarks :</strong> {data.remark}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 3. INSTRUCTION SPECIFIC */}
+              {/* 3. INSTRUCTION BODY */}
               {type === 'instruction' && (
-                <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#0F172A', marginTop: '12px' }}>
+                <div style={{ fontSize: '12px', lineHeight: '1.8', color: '#0F172A', marginTop: '16px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '15px', fontWeight: '700', color: primaryColor, textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                      {data.title || 'PATIENT INSTRUCTION'}
+                    </h2>
+                  </div>
                   <div style={{ whiteSpace: 'pre-wrap' }}>
                     {data.description || data.content || 'Please follow all medical guidelines as instructed.'}
                   </div>
                 </div>
               )}
 
-              {/* 4. CONSENT SPECIFIC */}
+              {/* 4. CONSENT BODY */}
               {type === 'consent' && (
-                <div style={{ fontSize: '12px', lineHeight: '1.75', color: '#0F172A', marginTop: '12px' }}>
-                  <div style={{ whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
+                <div style={{ fontSize: '12px', lineHeight: '1.75', color: '#0F172A', marginTop: '16px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '15px', fontWeight: '700', color: primaryColor, textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                      {data.title || 'PATIENT PROCEDURE CONSENT'}
+                    </h2>
+                  </div>
+
+                  <div style={{ whiteSpace: 'pre-wrap', marginBottom: '30px' }}>
                     {data.content || 'I hereby give full consent to the medical procedure and treatment as explained by the practitioner.'}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '40px' }}>
                     {/* Patient Signature */}
                     <div style={{ border: '1px solid #CBD5E1', padding: '10px 14px', borderRadius: '6px', minWidth: '170px', textAlign: 'center' }}>
                       {data.patient_signature && (data.patient_signature.startsWith('http') || data.patient_signature.startsWith('data:')) ? (
@@ -578,15 +627,9 @@ export default function PdfPreviewModal({
                     </div>
 
                     {/* Stamp */}
-                    {showStamp && (
+                    {showStamp && stampUrl && (
                       <div style={{ textAlign: 'center' }}>
-                        {stampUrl ? (
-                          <img src={stampUrl} alt="Stamp" style={{ width: '65px', height: '65px', objectFit: 'contain' }} />
-                        ) : (
-                          <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: `1.5px dashed ${primaryColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: primaryColor }}>
-                            STAMP
-                          </div>
-                        )}
+                        <img src={stampUrl} alt="Stamp" style={{ width: '75px', height: '75px', objectFit: 'contain' }} />
                       </div>
                     )}
 
@@ -604,7 +647,7 @@ export default function PdfPreviewModal({
                       <div style={{ borderTop: '1px solid #94A3B8', marginTop: '6px', paddingTop: '4px', fontSize: '10px', fontWeight: 'bold' }}>
                         Doctor Witness Signature
                       </div>
-                      <div style={{ fontSize: '9px', color: '#64748B' }}>{doctorName ? `Dr. ${doctorName}` : 'Attending Doctor'}</div>
+                      <div style={{ fontSize: '9px', color: '#64748B' }}>Dr. {doctorName}</div>
                     </div>
                   </div>
                 </div>
@@ -613,48 +656,28 @@ export default function PdfPreviewModal({
 
             {/* BOTTOM SECTION: Stamp, Signature & Footer Strip (For Prescription & Certificate) */}
             {type !== 'consent' && (
-              <div style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+              <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '16px' }}>
                   {/* Stamp */}
-                  <div style={{ width: '70px', height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {showStamp && (
-                      stampUrl ? (
-                        <img src={stampUrl} alt="Stamp" style={{ maxWidth: '70px', maxHeight: '70px', objectFit: 'contain' }} />
-                      ) : (
-                        <div style={{
-                          width: '60px',
-                          height: '60px',
-                          borderRadius: '50%',
-                          border: `2px dashed ${primaryColor}60`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: `${primaryColor}90`,
-                          fontSize: '9px',
-                          textAlign: 'center'
-                        }}>
-                          CLINIC STAMP
-                        </div>
-                      )
+                  <div style={{ width: '90px', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {showStamp && stampUrl && (
+                      <img src={stampUrl} alt="Stamp" style={{ maxWidth: '90px', maxHeight: '90px', objectFit: 'contain' }} />
                     )}
                   </div>
 
                   {/* Signature */}
                   {showSignature && (
-                    <div style={{ textAlign: 'center', minWidth: '130px' }}>
+                    <div style={{ textAlign: 'center', minWidth: '150px' }}>
                       {signatureUrl ? (
-                        <img src={signatureUrl} alt="Doctor Signature" style={{ maxHeight: '38px', objectFit: 'contain', marginBottom: '2px' }} />
+                        <img src={signatureUrl} alt="Doctor Signature" style={{ maxWidth: '130px', maxHeight: '48px', objectFit: 'contain', marginBottom: '4px' }} />
                       ) : (
-                        <div style={{ height: '32px', color: '#94A3B8', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          Digital Signature
-                        </div>
+                        <div style={{ height: '36px' }} />
                       )}
-                      <div style={{ width: '120px', height: '1px', background: '#64748B', margin: '0 auto 4px auto' }} />
-                      <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0F172A' }}>
-                        {doctorName ? `Dr. ${doctorName}` : 'Attending Doctor'}
+                      <div style={{ width: '140px', height: '1px', background: '#64748B', margin: '0 auto 4px auto' }} />
+                      <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#0F172A' }}>
+                        Dr. {doctorName}
                       </div>
-                      {doctorQualification && <div style={{ fontSize: '9.5px', color: '#64748B' }}>{doctorQualification}</div>}
-                      {doctorReg && <div style={{ fontSize: '9px', color: '#64748B' }}>Reg: {doctorReg}</div>}
+                      {doctorQualification && <div style={{ fontSize: '10px', color: '#64748B' }}>{doctorQualification}</div>}
                     </div>
                   )}
                 </div>
@@ -663,7 +686,7 @@ export default function PdfPreviewModal({
                 {showFooter && (
                   <div style={{
                     background: '#F1F5F9',
-                    padding: '6px 10px',
+                    padding: '7px 12px',
                     borderRadius: '4px',
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -671,7 +694,7 @@ export default function PdfPreviewModal({
                     fontSize: '9.5px',
                     color: '#475569'
                   }}>
-                    <div>{clinicName} {clinicPhone && `• Contact: ${clinicPhone}`}</div>
+                    <div>{clinicName} {clinicPhone}</div>
                     <div>{footerText}</div>
                   </div>
                 )}
@@ -681,18 +704,22 @@ export default function PdfPreviewModal({
             {/* CONSENT FOOTER BAR */}
             {type === 'consent' && showFooter && (
               <div style={{
-                marginTop: '20px',
-                background: '#F1F5F9',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '9.5px',
-                color: '#475569'
+                marginTop: 'auto',
+                paddingTop: '20px'
               }}>
-                <div>{clinicName} {clinicPhone && `• Contact: ${clinicPhone}`}</div>
-                <div>{footerText}</div>
+                <div style={{
+                  background: '#F1F5F9',
+                  padding: '7px 12px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '9.5px',
+                  color: '#475569'
+                }}>
+                  <div>{clinicName} {clinicPhone}</div>
+                  <div>{footerText}</div>
+                </div>
               </div>
             )}
           </div>

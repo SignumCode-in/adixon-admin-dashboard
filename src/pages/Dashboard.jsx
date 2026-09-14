@@ -24,7 +24,7 @@ import {
   CheckCircle,
   FileText
 } from 'lucide-react';
-import { patientAPI, appointmentAPI, prescriptionAPI, clinicAPI } from '../services/api';
+import { dashboardAPI, patientAPI, appointmentAPI, prescriptionAPI, clinicAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useClinic } from '../context/ClinicContext';
 
@@ -79,10 +79,75 @@ export default function Dashboard() {
       try {
         const queryParams = selectedClinicId && selectedClinicId !== 'all' ? { clinic_id: selectedClinicId } : {};
 
+        // 1. Try dedicated analytics endpoint first
+        try {
+          const analyticsRes = await dashboardAPI.getAnalytics(queryParams);
+          if (analyticsRes && analyticsRes.success && analyticsRes.data) {
+            const { summary, appointment_status, gender_distribution, monthly_trends, today_appointments_list } = analyticsRes.data;
+            setStats({
+              totalPatients: summary.total_patients || 0,
+              todayAppointmentsCount: summary.today_appointments || 0,
+              upcomingAppointmentsCount: summary.upcoming_appointments || 0,
+              totalPrescriptions: summary.total_prescriptions || 0,
+              totalClinicsCount: summary.total_clinics || clinics.length || 1,
+            });
+
+            setTodayAppointments(today_appointments_list || []);
+
+            setMonthlyGrowthData({
+              labels: monthly_trends.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              datasets: [
+                {
+                  label: 'New Patients Registered',
+                  data: monthly_trends.patients || new Array(12).fill(0),
+                  borderColor: '#378ADD',
+                  backgroundColor: 'rgba(55, 138, 221, 0.15)',
+                  fill: true,
+                  tension: 0.3,
+                }
+              ]
+            });
+
+            setAppointmentStatusData({
+              labels: ['Scheduled', 'Completed', 'Cancelled', 'Rescheduled'],
+              datasets: [
+                {
+                  label: 'Appointments Count',
+                  data: [
+                    appointment_status.scheduled || 0,
+                    appointment_status.completed || 0,
+                    appointment_status.cancelled || 0,
+                    appointment_status.rescheduled || 0
+                  ],
+                  backgroundColor: ['#378ADD', '#1D9E75', '#E24B4A', '#BA7517'],
+                  borderWidth: 1,
+                }
+              ]
+            });
+
+            setGenderDistributionData({
+              labels: ['Male', 'Female', 'Other'],
+              datasets: [
+                {
+                  data: [gender_distribution.male || 0, gender_distribution.female || 0, gender_distribution.other || 0],
+                  backgroundColor: ['#378ADD', '#7F77DD', '#1D9E75'],
+                  borderWidth: 1,
+                }
+              ]
+            });
+
+            setLoading(false);
+            return;
+          }
+        } catch (analyticsErr) {
+          console.warn('Analytics endpoint fallback:', analyticsErr);
+        }
+
+        // 2. Fallback to individual live API calls with pagination metadata
         const promises = [
-          patientAPI.getPatients(queryParams),
-          appointmentAPI.getAppointments(queryParams),
-          prescriptionAPI.getPrescriptions(queryParams),
+          patientAPI.getPatients({ ...queryParams, limit: 100 }),
+          appointmentAPI.getAppointments({ ...queryParams, limit: 100 }),
+          prescriptionAPI.getPrescriptions({ ...queryParams, limit: 100 }),
         ];
 
         if (isAdmin) {
@@ -91,10 +156,15 @@ export default function Dashboard() {
 
         const [patientsRes, apptsRes, presRes, clinicsRes] = await Promise.allSettled(promises);
 
-        const patientsList = patientsRes.status === 'fulfilled' ? (patientsRes.value?.data?.data || patientsRes.value?.data || []) : [];
-        const apptsList = apptsRes.status === 'fulfilled' ? (apptsRes.value?.data?.data || apptsRes.value?.data || []) : [];
-        const presList = presRes.status === 'fulfilled' ? (presRes.value?.data?.data || presRes.value?.data || []) : [];
-        const clinicsList = clinicsRes?.status === 'fulfilled' ? (clinicsRes.value?.data?.data || clinicsRes.value?.data || []) : [];
+        const pVal = patientsRes.status === 'fulfilled' ? patientsRes.value : null;
+        const aVal = apptsRes.status === 'fulfilled' ? apptsRes.value : null;
+        const prVal = presRes.status === 'fulfilled' ? presRes.value : null;
+        const cVal = clinicsRes?.status === 'fulfilled' ? clinicsRes.value : null;
+
+        const patientsList = Array.isArray(pVal?.data) ? pVal.data : (Array.isArray(pVal?.data?.data) ? pVal.data.data : []);
+        const apptsList = Array.isArray(aVal?.data) ? aVal.data : (Array.isArray(aVal?.data?.data) ? aVal.data.data : []);
+        const presList = Array.isArray(prVal?.data) ? prVal.data : (Array.isArray(prVal?.data?.data) ? prVal.data.data : []);
+        const clinicsList = Array.isArray(cVal?.data) ? cVal.data : (Array.isArray(cVal?.data?.data) ? cVal.data.data : []);
 
         const todayStr = new Date().toDateString();
         
@@ -109,11 +179,11 @@ export default function Dashboard() {
         }).length : 0;
 
         setStats({
-          totalPatients: Array.isArray(patientsList) ? patientsList.length : 0,
+          totalPatients: pVal?.pagination?.total_records ?? pVal?.data?.pagination?.total_records ?? pVal?.count ?? patientsList.length,
           todayAppointmentsCount: todayList.length,
           upcomingAppointmentsCount: upcomingCount,
-          totalPrescriptions: Array.isArray(presList) ? presList.length : 0,
-          totalClinicsCount: Array.isArray(clinicsList) ? clinicsList.length : clinics.length || 1,
+          totalPrescriptions: prVal?.pagination?.total_records ?? prVal?.data?.pagination?.total_records ?? prVal?.count ?? presList.length,
+          totalClinicsCount: cVal?.pagination?.total_records ?? cVal?.data?.pagination?.total_records ?? cVal?.count ?? clinicsList.length ?? (clinics.length || 1),
         });
 
         setTodayAppointments(todayList.slice(0, 5));
@@ -362,24 +432,32 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {todayAppointments.map((a) => (
-                <tr key={a._id}>
-                  <td style={{ fontWeight: 'bold' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Users size={16} color="var(--color-primary)" />
-                      {a.patient_id?.full_name || 'Patient Entry'}
-                    </span>
-                  </td>
-                  <td>{a.time || a.time_slot || '10:00 AM'}</td>
-                  <td>{a.doctor_id?.full_name || 'Primary Doctor'}</td>
-                  <td>{a.notes || '-'}</td>
-                  <td>
-                    <span className={`badge ${a.status === 'completed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-info'}`}>
-                      {a.status || 'scheduled'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {todayAppointments.map((a) => {
+                const patId = a.patient_id?._id || (typeof a.patient_id === 'string' ? a.patient_id : null);
+                return (
+                  <tr 
+                    key={a._id}
+                    onClick={() => patId && navigate(isAdmin ? `/admin/patients/${patId}` : `/patients/${patId}`)}
+                    style={{ cursor: patId ? 'pointer' : 'default' }}
+                    title={patId ? "Click to view patient details" : ""}
+                  >
+                    <td style={{ fontWeight: 'bold' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: patId ? 'var(--color-primary)' : 'inherit' }}>
+                        <Users size={16} color="var(--color-primary)" />
+                        <span>{a.patient_id?.full_name || 'Patient Entry'}</span>
+                      </span>
+                    </td>
+                    <td>{a.time || a.time_slot || '10:00 AM'}</td>
+                    <td>{a.doctor_id?.full_name || 'Primary Doctor'}</td>
+                    <td>{a.notes || '-'}</td>
+                    <td>
+                      <span className={`badge ${a.status === 'completed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-info'}`}>
+                        {a.status || 'scheduled'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {todayAppointments.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-tertiary)' }}>

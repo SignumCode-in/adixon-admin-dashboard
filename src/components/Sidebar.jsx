@@ -74,8 +74,12 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
 
     return (
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">AD</div>
+        <div className="sidebar-header" style={{ padding: isCollapsed ? '16px 8px' : '14px 16px' }}>
+          <img 
+            src="/adixon-logo.png" 
+            alt="Adixon Clinic OS" 
+            style={{ height: isCollapsed ? '24px' : '30px', maxWidth: isCollapsed ? '34px' : '110px', objectFit: 'contain' }} 
+          />
           {!isCollapsed && (
             <div className="sidebar-brand-wrapper">
               <span className="sidebar-brand">{activeClinicName || 'Clinic View'}</span>
@@ -144,7 +148,7 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
           { title: 'Analytics', path: '/analytics', icon: <BarChart3 size={18} /> },
           { title: 'Security Audit', path: '/security', icon: <ShieldCheck size={18} /> },
           { title: 'Clinics Directory', path: '/clinics', icon: <Hospital size={18} /> },
-          { title: 'Access Control', path: '/access-control', icon: <Lock size={18} /> },
+          { title: 'Firewall & Sessions', path: '/access-control', icon: <Lock size={18} /> },
           { title: 'Settings', path: '/settings', icon: <Settings size={18} /> },
         ]
       }
@@ -161,7 +165,6 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
           { title: 'Consents', path: '/consents', icon: <ClipboardCheck size={18} />, permission: 'consents' },
           { title: 'Templates', path: '/templates', icon: <Layout size={18} />, permission: 'templates' },
           { title: 'Medicines', path: '/medicines', icon: <Pill size={18} />, permission: 'medicines' },
-          { title: 'Labs & Tests', path: '/labs', icon: <FlaskConical size={18} />, permission: 'labs' },
           { title: 'Users & Staff', path: '/users', icon: <Users size={18} /> },
           { title: 'Settings', path: '/settings', icon: <Settings size={18} /> },
         ]
@@ -181,13 +184,13 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, o
 
   return (
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
-      <div className="sidebar-header">
-        <div className="sidebar-logo">AD</div>
-        {!isCollapsed && (
-          <div className="sidebar-brand-wrapper">
-            <span className="sidebar-brand">Adixon System</span>
-            <span className="sidebar-subbrand">{user?.role === 'admin' ? 'Master Admin Scope' : 'Clinic Dashboard'}</span>
+      <div className="sidebar-header" style={{ padding: isCollapsed ? '16px 8px' : '16px 18px' }}>
+        {!isCollapsed ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/adixon-logo.png" alt="Adixon Clinic OS" style={{ height: '34px', maxWidth: '140px', objectFit: 'contain' }} />
           </div>
+        ) : (
+          <img src="/adixon-logo.png" alt="Adixon" style={{ height: '22px', maxWidth: '36px', objectFit: 'contain' }} />
         )}
         <button className="menu-toggle" onClick={onToggleCollapse}>
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

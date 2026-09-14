@@ -18,7 +18,9 @@ import {
   Lock,
   ArrowLeft,
   Users as UsersIcon,
-  ShieldAlert
+  ShieldAlert,
+  Pill,
+  HardDrive
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { clinicAPI } from '../../services/api';
@@ -68,7 +70,9 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOp
       { title: 'Instructions', path: `/admin/clinics/${activeClinicId}/instructions`, icon: <FileText size={18} /> },
       { title: 'Consents', path: `/admin/clinics/${activeClinicId}/consents`, icon: <ClipboardCheck size={18} /> },
       { title: 'Templates', path: `/admin/clinics/${activeClinicId}/templates`, icon: <Layout size={18} /> },
-      { title: 'Settings', path: `/admin/clinics/${activeClinicId}/settings`, icon: <Settings size={18} /> },
+      { title: 'Medicines', path: `/admin/clinics/${activeClinicId}/medicines`, icon: <Pill size={18} /> },
+      { title: 'Storage Footprint', path: `/admin/clinics/${activeClinicId}/storage`, icon: <HardDrive size={18} /> },
+      { title: 'Clinic Settings', path: `/admin/clinics/${activeClinicId}/settings`, icon: <Settings size={18} /> },
     ];
 
     return (
@@ -87,11 +91,15 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOp
           />
         )}
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} style={{ zIndex: 100 }}>
-          <div className="sidebar-header">
-            <div className="sidebar-logo" style={{ background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>AD</div>
+          <div className="sidebar-header" style={{ padding: isCollapsed ? '16px 8px' : '14px 16px' }}>
+            <img 
+              src="/adixon-logo.png" 
+              alt="Adixon Clinic OS" 
+              style={{ height: isCollapsed ? '24px' : '30px', maxWidth: isCollapsed ? '34px' : '110px', objectFit: 'contain' }} 
+            />
             {!isCollapsed && (
               <div className="sidebar-brand-wrapper">
-                <span className="sidebar-brand">{activeClinicName || 'Clinic Scope'}</span>
+                <span className="sidebar-brand" style={{ fontSize: '13px' }}>{activeClinicName || 'Clinic Scope'}</span>
                 <span className="sidebar-subbrand">Tenant Oversight</span>
               </div>
             )}
@@ -155,16 +163,17 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOp
       title: 'Platform Governance',
       items: [
         { title: 'Platform Analytics', path: '/admin/dashboard', icon: <BarChart3 size={18} /> },
-        { title: 'Clinic Dashboard', path: '/admin/clinic-dashboard', icon: <Layout size={18} /> },
+        { title: 'Platform Storage', path: '/admin/storage', icon: <HardDrive size={18} /> },
         { title: 'Clinics Directory', path: '/admin/clinics', icon: <Hospital size={18} /> },
         { title: 'Global Users & Doctors', path: '/admin/users', icon: <UsersIcon size={18} /> },
+        { title: 'Global Medicines', path: '/admin/medicines', icon: <Pill size={18} /> },
       ]
     },
     {
       title: 'Security & Access',
       items: [
         { title: 'Security Dashboard', path: '/admin/security', icon: <ShieldAlert size={18} /> },
-        { title: 'Access Control', path: '/admin/access-control', icon: <Lock size={18} /> },
+        { title: 'Firewall & Sessions', path: '/admin/access-control', icon: <Lock size={18} /> },
         { title: 'System Audit Logs', path: '/admin/audit-logs', icon: <ShieldCheck size={18} /> },
       ]
     },
@@ -192,13 +201,13 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOp
         />
       )}
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`} style={{ zIndex: 100 }}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo" style={{ background: 'linear-gradient(135deg, #4f46e5, #06b6d4)' }}>AD</div>
-          {!isCollapsed && (
-            <div className="sidebar-brand-wrapper">
-              <span className="sidebar-brand">Adixon Admin</span>
-              <span className="sidebar-subbrand">Master Command Center</span>
+        <div className="sidebar-header" style={{ padding: isCollapsed ? '16px 8px' : '16px 18px' }}>
+          {!isCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img src="/adixon-logo.png" alt="Adixon Clinic OS" style={{ height: '34px', maxWidth: '140px', objectFit: 'contain' }} />
             </div>
+          ) : (
+            <img src="/adixon-logo.png" alt="Adixon" style={{ height: '22px', maxWidth: '36px', objectFit: 'contain' }} />
           )}
           <button className="menu-toggle" onClick={isMobileOpen ? onCloseMobile : onToggleCollapse}>
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

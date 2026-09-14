@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clinicAPI } from '../services/api';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import { Hospital, PlusCircle, Search, Edit2, ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
+import { Hospital, PlusCircle, Search, Edit2, ArrowLeft, Trash2, ExternalLink, Phone, Mail, MapPin, Clock } from 'lucide-react';
 
 export default function Clinics() {
   const navigate = useNavigate();
   const [clinics, setClinics] = useState([]);
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_clinics') || 'list');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -343,8 +345,8 @@ export default function Clinics() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
             className="input-field"
@@ -355,14 +357,94 @@ export default function Clinics() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle 
+          mode={displayMode} 
+          onChange={(m) => {
+            setDisplayMode(m);
+            localStorage.setItem('adixon_view_mode_clinics', m);
+          }} 
+        />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading clinic entries...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No clinics registered.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading clinic entries...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No clinics registered.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((c) => {
+            const logoSrc = c.logo?.secure_url || c.logo?.url || (typeof c.logo === 'string' && c.logo) || c.profile_url || '/adixon-logo.png';
+            return (
+              <div key={c._id} className="record-card">
+                <div className="record-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '4px' }}>
+                      <img src={logoSrc} alt={c.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} onError={(e) => { e.currentTarget.src = '/adixon-logo.png'; }} />
+                    </div>
+                    <div>
+                      <div 
+                        style={{ fontWeight: '700', fontSize: '15px', color: 'var(--color-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => navigate(`/admin/clinics/${c._id}`)}
+                      >
+                        {c.name}
+                        <ExternalLink size={12} />
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                        {c.tagline || 'Healthcare Facility'}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="badge badge-success" style={{ fontSize: '10px' }}>Active</span>
+                </div>
+
+                <div className="record-card-body">
+                  {c.phone && (
+                    <div className="record-card-row">
+                      <Phone size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                      <span>{c.phone}</span>
+                    </div>
+                  )}
+                  {c.email && (
+                    <div className="record-card-row">
+                      <Mail size={13} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                      <span>{c.email}</span>
+                    </div>
+                  )}
+                  {c.address && (
+                    <div className="record-card-row">
+                      <MapPin size={13} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                      <span>{c.address}</span>
+                    </div>
+                  )}
+                  <div className="record-card-row" style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                    <Clock size={13} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+                    <span>{c.open_days || 'Mon - Sat'} • {c.visit_hours || '09:00 AM - 08:00 PM'}</span>
+                  </div>
+                </div>
+
+                <div className="record-card-footer">
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                    onClick={() => navigate(`/admin/clinics/${c._id}`)}
+                  >
+                    <Hospital size={12} /> Overview & EHR
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px' }} onClick={() => handleOpenEdit(c)}>
+                      <Edit2 size={12} /> Edit
+                    </button>
+                    <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)}>
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -393,22 +475,13 @@ export default function Clinics() {
                   <td>{c.email || 'N/A'}</td>
                   <td>{c.address || 'N/A'}</td>
                   <td>{c.open_days || 'Mon - Sat'}</td>
-                  <td>{c.visit_hours || 'N/A'}</td>
+                  <td>{c.visit_hours || '09:00 AM - 08:00 PM'}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <button 
-                        className="btn btn-primary" 
-                        style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }} 
-                        onClick={() => navigate(`/admin/clinics/${c._id}`)}
-                        title="View Clinic Details & Operational Dashboard"
-                      >
-                        <Hospital size={13} />
-                        View Clinic
-                      </button>
-                      <button className="icon-btn" onClick={() => handleOpenEdit(c)} title="Edit clinic info">
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="icon-btn" onClick={() => handleOpenEdit(c)} title="Edit clinic branch">
                         <Edit2 size={14} />
                       </button>
-                      <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)} title="Delete clinic">
+                      <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)} title="Delete clinic branch">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -417,8 +490,8 @@ export default function Clinics() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal

@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
-  // Load user from localStorage and refresh from backend
+  // Load user from localStorage and verify live session with backend
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem('id_token');
@@ -19,13 +19,8 @@ export const AuthProvider = ({ children }) => {
 
       if (savedToken && savedUser) {
         setToken(savedToken);
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch (e) {
-          console.error('Failed to parse cached user:', e);
-        }
 
-        // Fresh profile fetch from backend
+        // Fresh profile fetch from backend to verify session validity
         try {
           const res = await userAPI.getMe();
           if (res && res.data) {
@@ -34,6 +29,23 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (err) {
           console.warn('Could not refresh user profile on init:', err?.message);
+          if (err.response?.status === 401 || err.response?.data?.session_revoked) {
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('session_id');
+            localStorage.removeItem('user');
+            const isAdminPath = window.location.pathname.startsWith('/admin');
+            window.location.href = isAdminPath ? '/admin/login' : '/login';
+            return;
+          }
+          // Only fallback to cached user if backend was unreachable
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch (e) {
+            console.error('Failed to parse cached user:', e);
+          }
         }
       }
       setLoading(false);
@@ -74,6 +86,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('id_token', idToken);
       localStorage.setItem('refresh_token', refreshToken);
       localStorage.setItem('user', JSON.stringify(userProfile));
+      if (loginRes.data?.session_id) {
+        localStorage.setItem('session_id', loginRes.data.session_id);
+      }
 
       return { success: true, user: userProfile };
     } catch (error) {
@@ -115,6 +130,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('id_token', idToken);
       localStorage.setItem('refresh_token', refreshToken);
       localStorage.setItem('user', JSON.stringify(userProfile));
+      if (loginRes.data?.session_id) {
+        localStorage.setItem('session_id', loginRes.data.session_id);
+      }
 
       return { success: true, user: userProfile };
     } catch (error) {
@@ -175,6 +193,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       localStorage.removeItem('id_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('session_id');
       localStorage.removeItem('user');
     }
   };

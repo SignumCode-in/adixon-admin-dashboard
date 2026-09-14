@@ -3,6 +3,7 @@ import { templateAPI, medicineAPI, labAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import ViewToggle from '../components/common/ViewToggle';
 import { 
   Layout, 
   PlusCircle, 
@@ -33,6 +34,14 @@ export default function Templates() {
 
   // Search filter
   const [search, setSearch] = useState('');
+
+  // Display Mode: 'list' | 'grid'
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_templates') || 'grid');
+
+  const handleDisplayModeChange = (mode) => {
+    setDisplayMode(mode);
+    localStorage.setItem('adixon_view_mode_templates', mode);
+  };
 
   // View Mode: 'list' | 'editor'
   const [viewMode, setViewMode] = useState('list');
@@ -77,8 +86,8 @@ export default function Templates() {
       const params = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [tempsRes, medsRes, labsRes, optsRes] = await Promise.allSettled([
         templateAPI.getTemplates(params),
-        medicineAPI.getMedicines({ limit: 100 }),
-        labAPI.getLabs({ limit: 100 }),
+        medicineAPI.getMedicines({ limit: 1000 }),
+        labAPI.getLabs({ limit: 1000 }),
         medicineAPI.getMedicineOptions(),
       ]);
 
@@ -714,8 +723,8 @@ export default function Templates() {
         ))}
       </div>
 
-      {/* Search Bar */}
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center' }}>
+      {/* Search Bar & View Toggle */}
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
@@ -727,14 +736,15 @@ export default function Templates() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle mode={displayMode} onChange={handleDisplayModeChange} />
       </div>
 
-      {/* Grid view of Template Cards */}
+      {/* Grid or Table view of Templates */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading templates...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No templates found in this category.</div>
-      ) : (
+      ) : displayMode === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
           {filtered.map((t) => {
             const tType = (t.type || '').toLowerCase();
@@ -801,6 +811,73 @@ export default function Templates() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Template Name</th>
+                <th>Category</th>
+                <th>Details / Items</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((t) => {
+                const tType = (t.type || '').toLowerCase();
+                const isMed = tType.includes('medicine') || tType.includes('prescription');
+                const isLab = tType.includes('lab');
+                const isConsent = tType.includes('consent');
+                const isInstruction = tType.includes('instruction');
+
+                return (
+                  <tr key={t._id}>
+                    <td style={{ fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {isLab ? (
+                          <FlaskConical size={16} color="var(--color-primary)" />
+                        ) : isConsent ? (
+                          <ClipboardCheck size={16} color="var(--color-primary)" />
+                        ) : isInstruction ? (
+                          <FileText size={16} color="var(--color-primary)" />
+                        ) : !isMed ? (
+                          <Award size={16} color="var(--color-primary)" />
+                        ) : (
+                          <Pill size={16} color="var(--color-primary)" />
+                        )}
+                        {t.name}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge badge-info" style={{ textTransform: 'capitalize' }}>
+                        {t.type || 'Template'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '12px', color: 'var(--color-text-secondary)', maxWidth: '350px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {isMed ? (
+                        <span>{t.medicines?.length || 0} medicine{(t.medicines?.length || 0) === 1 ? '' : 's'} included</span>
+                      ) : isLab ? (
+                        <span>{t.labs?.length || 0} test{(t.labs?.length || 0) === 1 ? '' : 's'} included</span>
+                      ) : (
+                        t.content || t.remarks || '—'
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="icon-btn" onClick={() => handleOpenEdit(t)} title="Edit template">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="icon-btn" style={{ color: 'var(--color-danger)' }} onClick={() => triggerDelete(t._id)} title="Delete template">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -4,12 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import PdfPreviewModal from '../components/PdfPreviewModal';
-import { FileBadge, PlusCircle, Search, Trash2, User, ArrowLeft, Printer } from 'lucide-react';
+import { FileBadge, PlusCircle, Search, Trash2, User, ArrowLeft, Printer, Calendar, Stethoscope, Clock } from 'lucide-react';
+import ViewToggle from '../components/common/ViewToggle';
 
 export default function Certificates() {
   const { user } = useAuth();
   const activeClinicId = useActiveClinicScope();
   const [certificates, setCertificates] = useState([]);
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_certs') || 'list');
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,8 +46,8 @@ export default function Certificates() {
       const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
       const clinicFilter = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [certsRes, patientsRes] = await Promise.all([
-        certificateAPI.getCertificates({ ...clinicFilter, limit: 100 }),
-        patientAPI.getPatients({ ...clinicFilter, limit: 100 }),
+        certificateAPI.getCertificates({ ...clinicFilter, limit: 1000 }),
+        patientAPI.getPatients({ ...clinicFilter, limit: 1000 }),
       ]);
 
       if (certsRes && certsRes.data) setCertificates(certsRes.data);
@@ -256,8 +258,8 @@ export default function Certificates() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '300px' }}>
+      <div className="card" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
           <input
             type="text"
             className="input-field"
@@ -268,14 +270,80 @@ export default function Certificates() {
           />
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: 'var(--color-text-tertiary)' }} />
         </div>
+        <ViewToggle 
+          mode={displayMode} 
+          onChange={(m) => {
+            setDisplayMode(m);
+            localStorage.setItem('adixon_view_mode_certs', m);
+          }} 
+        />
       </div>
 
-      <div className="table-responsive">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading certificates database...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No certificate records registered.</div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>Loading certificates database...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-tertiary)' }}>No certificate records registered.</div>
+      ) : displayMode === 'grid' ? (
+        <div className="records-grid">
+          {filtered.map((c) => (
+            <div key={c._id} className="record-card">
+              <div className="record-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                    <FileBadge size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                      {c.patient_id?.full_name || 'Walk-in Patient'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={11} /> {new Date(c.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                <span className="badge badge-warning" style={{ fontSize: '10px', textTransform: 'capitalize' }}>
+                  {c.certificate_type}
+                </span>
+              </div>
+
+              <div className="record-card-body">
+                {c.duration && (
+                  <div className="record-card-row">
+                    <Clock size={13} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+                    <span>Duration: <strong>{c.duration}</strong></span>
+                  </div>
+                )}
+                <div className="record-card-row">
+                  <Stethoscope size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                  <span>Doctor: {c.doctor_id?.full_name || 'Duty Doctor'}</span>
+                </div>
+                {c.content && (
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', padding: '6px 8px', borderRadius: '6px', marginTop: '4px', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {c.content}
+                  </div>
+                )}
+              </div>
+
+              <div className="record-card-footer">
+                <button 
+                  className="btn btn-primary" 
+                  style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                  onClick={() => {
+                    setPreviewCert(c);
+                    setPdfModalOpen(true);
+                  }}
+                >
+                  <Printer size={12} /> PDF Preview
+                </button>
+                <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px', gap: '4px', color: 'var(--color-danger)' }} onClick={() => triggerDelete(c._id)}>
+                  <Trash2 size={12} /> Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -328,8 +396,8 @@ export default function Certificates() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Popup Dialog Modal */}
       <ConfirmDeleteModal

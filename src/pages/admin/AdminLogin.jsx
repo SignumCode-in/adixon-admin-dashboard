@@ -100,19 +100,17 @@ export default function AdminLogin() {
     <div className="auth-wrapper">
       <div className="auth-card" style={{ maxWidth: '440px' }}>
         <div className="auth-header">
-          <div 
-            className="auth-logo" 
+          <img 
+            src="/adixon-logo.png" 
+            alt="Adixon Clinic OS" 
             style={{ 
-              background: 'linear-gradient(135deg, #4f46e5, #06b6d4)', 
-              boxShadow: '0 8px 24px rgba(79, 70, 229, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px'
-            }}
-          >
-            <ShieldCheck size={26} style={{ color: '#ffffff' }} />
-          </div>
+              height: '42px', 
+              maxWidth: '180px', 
+              objectFit: 'contain', 
+              margin: '0 auto 18px', 
+              display: 'block' 
+            }} 
+          />
           <h2 className="auth-title" style={{ letterSpacing: '-0.02em' }}>Platform Administration</h2>
           <p className="auth-subtitle">Master command center & multi-tenant governance</p>
         </div>
@@ -368,7 +366,21 @@ export default function AdminLogin() {
           </form>
         )}
 
-        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--color-border)', textAlign: 'center' }}>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+            Healthcare Provider or Clinic Staff?
+          </p>
+          <button 
+            type="button"
+            className="btn btn-secondary" 
+            style={{ width: '100%', justifyContent: 'center', fontSize: '13px', gap: '6px' }}
+            onClick={() => navigate('/login')}
+          >
+            &larr; Return to Clinic Portal Login
+          </button>
+        </div>
+
+        <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={toggleTheme}
             className="btn btn-secondary"
