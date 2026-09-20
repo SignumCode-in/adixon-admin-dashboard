@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { medicineAPI } from '../services/api';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import ExcelUploadModal from '../components/ExcelUploadModal';
 import { Pill, PlusCircle, Search, Trash2, Edit2, ArrowLeft, FileSpreadsheet, Globe, X, Sparkles, Clock, CheckCircle2 } from 'lucide-react';
 import ViewToggle from '../components/common/ViewToggle';
+import { useActiveClinicScope } from '../hooks/useActiveClinicScope';
+import { useAuth } from '../context/AuthContext';
 
 
 export default function Medicines() {
+  const activeClinicId = useActiveClinicScope();
+  const { user, isAdmin } = useAuth();
   const [medicines, setMedicines] = useState([]);
   const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('adixon_view_mode_medicines') || 'list');
   const [loading, setLoading] = useState(true);
@@ -27,6 +31,10 @@ export default function Medicines() {
   const [isEdit, setIsEdit] = useState(false);
   const [editId, setEditId] = useState(null);
 
+  // Editor Autocomplete Suggestions
+  const [showEditorSuggestions, setShowEditorSuggestions] = useState(false);
+  const [editorSuggestions, setEditorSuggestions] = useState([]);
+
   // Delete Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -44,14 +52,52 @@ export default function Medicines() {
   const [instruction, setInstruction] = useState('After Meals');
   const [comments, setComments] = useState('');
 
+  // Master Options from API
+  const [masterRoutes, setMasterRoutes] = useState(['Oral', 'Tablet', 'Capsule', 'Syrup', 'Injection', 'Topical', 'Drops', 'Inhaler', 'Ointment']);
+  const [masterFrequencies, setMasterFrequencies] = useState(['1-0-1', '1-0-0', '0-0-1', '1-1-1', '1-0-1-1', '0-1-0', 'SOS', 'Once Weekly']);
+  const [masterInstructions, setMasterInstructions] = useState(['After Food', 'After Meals', 'Before Food', 'Before Meals', 'With Water', 'At Bedtime', 'Empty Stomach', 'With Milk']);
+
+  const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const optsRes = await medicineAPI.getMedicineOptions();
+        const data = optsRes?.data || optsRes;
+        if (data?.routes && Array.isArray(data.routes) && data.routes.length > 0) {
+          setMasterRoutes(data.routes);
+        }
+        if (data?.frequencies && Array.isArray(data.frequencies) && data.frequencies.length > 0) {
+          setMasterFrequencies(data.frequencies);
+        }
+        if (data?.instructions && Array.isArray(data.instructions) && data.instructions.length > 0) {
+          setMasterInstructions(data.instructions);
+        }
+      } catch (err) {
+        console.warn('Failed to load medicine options:', err);
+      }
+    };
+    fetchOptions();
+  }, []);
+
   const loadMedicines = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await medicineAPI.getMedicines();
-      if (res && res.data) {
-        setMedicines(res.data);
+      const params = { limit: 1000 };
+      if (targetClinicId && targetClinicId !== 'all') {
+        params.clinic_id = targetClinicId;
+        params.clinic_only = true;
       }
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+      const res = await medicineAPI.getMedicines(params);
+      const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const clinicItems = targetClinicId && targetClinicId !== 'all'
+        ? items.filter((m) => m.is_clinic_medicine || (m.clinic_id && String(m.clinic_id?._id || m.clinic_id) === String(targetClinicId)))
+        : items;
+      setMedicines(clinicItems);
     } catch (err) {
       console.error(err);
       setError('Failed to fetch medicine listings from database.');
@@ -62,7 +108,30 @@ export default function Medicines() {
 
   useEffect(() => {
     loadMedicines();
-  }, []);
+  }, [activeClinicId, search]);
+
+  useEffect(() => {
+    if (!name.trim() || isEdit) {
+      setEditorSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const p = { search: name.trim(), limit: 10 };
+        if (targetClinicId && targetClinicId !== 'all') {
+          p.clinic_id = targetClinicId;
+        }
+        const res = await medicineAPI.getMedicines(p);
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setEditorSuggestions(list);
+      } catch (e) {
+        setEditorSuggestions(
+          medicines.filter((m) => (m.name || '').toLowerCase().includes(name.toLowerCase())).slice(0, 10)
+        );
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [name, isEdit, targetClinicId]);
 
   const handleOpenAdd = () => {
     setIsEdit(false);
@@ -149,6 +218,9 @@ export default function Medicines() {
       instruction,
       additional_comments: comments,
     };
+    if (targetClinicId && targetClinicId !== 'all') {
+      payload.clinic_id = targetClinicId;
+    }
 
     try {
       if (isEdit) {
@@ -163,6 +235,26 @@ export default function Medicines() {
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || 'Error occurred while saving medicine details.');
+    }
+  };
+
+  const handleSelectSuggestion = (m) => {
+    setName(m.name || '');
+    setQuantity(m.quantity || 1);
+    setFrequency(m.frequency || '1-0-1');
+    setRoute(m.route || 'Oral');
+    setNoOfDays(m.no_of_days || 5);
+    setInstruction(m.instruction || 'After Meals');
+    setComments(m.additional_comments || '');
+    setShowEditorSuggestions(false);
+
+    // If selected medicine is from clinic (not master data), switch to update mode
+    if (m.is_clinic_medicine || m.source === 'clinic' || (m.clinic_id && m._id)) {
+      setIsEdit(true);
+      setEditId(m._id);
+    } else {
+      setIsEdit(false);
+      setEditId(null);
     }
   };
 
@@ -196,16 +288,84 @@ export default function Medicines() {
           )}
 
           <form onSubmit={handleFormSubmit}>
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label" style={{ fontWeight: 'bold' }}>Medicine Name *</label>
+            <div className="form-group" style={{ marginBottom: '16px', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label className="form-label" style={{ fontWeight: 'bold', margin: 0 }}>Medicine Name *</label>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                  Type to search & auto-fill from catalogue
+                </span>
+              </div>
               <input
                 type="text"
                 className="input-field"
                 placeholder="e.g. Paracetamol 650mg"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setShowEditorSuggestions(true);
+                }}
+                onFocus={() => setShowEditorSuggestions(true)}
                 required
               />
+              {showEditorSuggestions && name.trim().length > 0 && !isEdit && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--color-surface, #1e293b)',
+                    border: '1px solid var(--color-border, #334155)',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    zIndex: 100,
+                    marginTop: '4px',
+                  }}
+                >
+                  {(editorSuggestions.length > 0
+                    ? editorSuggestions
+                    : medicines.filter((m) => (m.name || '').toLowerCase().includes(name.toLowerCase()))
+                  )
+                    .slice(0, 10)
+                    .map((m, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectSuggestion(m)}
+                        style={{
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.05))',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>
+                            {m.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
+                            {[m.route, m.frequency, m.no_of_days ? `${m.no_of_days} days` : null, m.instruction].filter(Boolean).join(' • ')}
+                          </div>
+                        </div>
+                        {m.is_clinic_medicine ? (
+                          <span className="badge badge-primary" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            Clinic
+                          </span>
+                        ) : (
+                          <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '2px 6px', opacity: 0.8 }}>
+                            Master
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
 
             <div className="form-row" style={{ marginBottom: '16px' }}>
@@ -238,22 +398,60 @@ export default function Medicines() {
                 <label className="form-label" style={{ fontWeight: 'bold' }}>Frequency Pattern *</label>
                 <input
                   type="text"
+                  list="medicine-frequency-options"
                   className="input-field"
                   placeholder="e.g. 1-0-1, 1-1-1"
                   value={frequency}
                   onChange={(e) => setFrequency(e.target.value)}
                   required
                 />
+                <datalist id="medicine-frequency-options">
+                  {masterFrequencies.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                  {['1-0-1', '1-0-0', '0-0-1', '1-1-1', 'SOS'].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className={`quick-chip ${frequency === f ? 'active' : ''}`}
+                      onClick={() => setFrequency(f)}
+                      style={{ fontSize: '10px', padding: '2px 8px' }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label" style={{ fontWeight: 'bold' }}>Intake Route</label>
                 <input
                   type="text"
+                  list="medicine-route-options"
                   className="input-field"
-                  placeholder="Oral, Intravenous, Topical"
+                  placeholder="Oral, Tablet, Syrup, Injection..."
                   value={route}
                   onChange={(e) => setRoute(e.target.value)}
                 />
+                <datalist id="medicine-route-options">
+                  {masterRoutes.map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                  {['Oral', 'Tablet', 'Capsule', 'Syrup', 'Topical'].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      className={`quick-chip ${route === r ? 'active' : ''}`}
+                      onClick={() => setRoute(r)}
+                      style={{ fontSize: '10px', padding: '2px 8px' }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -261,11 +459,30 @@ export default function Medicines() {
               <label className="form-label" style={{ fontWeight: 'bold' }}>Special Intake Instruction</label>
               <input
                 type="text"
+                list="medicine-instruction-options"
                 className="input-field"
-                placeholder="After meals, Before sleep"
+                placeholder="After Meals, Before Food, With Water..."
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
               />
+              <datalist id="medicine-instruction-options">
+                {masterInstructions.map((ins) => (
+                  <option key={ins} value={ins} />
+                ))}
+              </datalist>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                {['After Food', 'Before Food', 'With Water', 'At Bedtime'].map((ins) => (
+                  <button
+                    key={ins}
+                    type="button"
+                    className={`quick-chip ${instruction === ins ? 'active' : ''}`}
+                    onClick={() => setInstruction(ins)}
+                    style={{ fontSize: '10px', padding: '2px 8px' }}
+                  >
+                    {ins}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: '24px' }}>
@@ -377,8 +594,19 @@ export default function Medicines() {
                     <Pill size={18} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                      {m.name}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                        {m.name}
+                      </span>
+                      {m.is_clinic_medicine ? (
+                        <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                          Clinic
+                        </span>
+                      ) : (
+                        <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px', opacity: 0.75 }}>
+                          Master
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
                       {m.route || 'Oral'} • {m.quantity} Units
@@ -443,9 +671,18 @@ export default function Medicines() {
               {filtered.map((m) => (
                 <tr key={m._id}>
                   <td style={{ fontWeight: 'bold' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <Pill size={16} color="var(--color-primary)" />
                       {m.name}
+                      {m.is_clinic_medicine ? (
+                        <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                          Clinic
+                        </span>
+                      ) : (
+                        <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px', opacity: 0.75 }}>
+                          Master
+                        </span>
+                      )}
                     </span>
                   </td>
                   <td>{m.quantity} Units</td>

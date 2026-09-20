@@ -112,7 +112,7 @@ export default function Prescriptions() {
       const [presRes, patientsRes, medsRes, labsRes, tempsRes, optsRes] = await Promise.allSettled([
         prescriptionAPI.getPrescriptions({ ...clinicFilter, limit: 2000 }),
         patientAPI.getPatients({ ...clinicFilter, limit: 2000 }),
-        medicineAPI.getMedicines({ limit: 1000 }),
+        medicineAPI.getMedicines({ ...clinicFilter, limit: 1000 }),
         labAPI.getLabs({ limit: 500 }),
         templateAPI.getTemplates({ ...clinicFilter, limit: 500 }),
         medicineAPI.getMedicineOptions(),
@@ -229,6 +229,12 @@ export default function Prescriptions() {
     }
     if (tpl.labs && tpl.labs.length > 0) {
       setLabs(prev => Array.from(new Set([...prev, ...tpl.labs])));
+    }
+    if (tpl.content || (tpl.type || '').toLowerCase().includes('instruction')) {
+      const text = (tpl.content || tpl.name || '').trim();
+      if (text) {
+        setTreatment(prev => prev.trim() ? `${prev.trim()}\n${text}` : text);
+      }
     }
     setShowTemplatePicker(null);
   };
@@ -494,7 +500,17 @@ export default function Prescriptions() {
                     <input type="text" className="input-field" placeholder="Acute Pulpitis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} required />
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    <label className="form-label">Treatment Plan / Advice</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Treatment Plan / Advice</label>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setShowTemplatePicker('advice')}
+                      >
+                        <Copy size={12} /> Select Template
+                      </button>
+                    </div>
                     <input type="text" className="input-field" placeholder="RCT advised, prescribe analgesics..." value={treatment} onChange={(e) => setTreatment(e.target.value)} />
                   </div>
                 </div>
@@ -615,17 +631,24 @@ export default function Prescriptions() {
                               onClick={() => {
                                 setCurrentMed({
                                   name: m.name || m.medicine_name || '',
-                                  quantity: m.quantity || m.qty || currentMed.quantity || 1,
-                                  route: m.route || m.form || currentMed.route || 'Oral',
-                                  frequency: m.frequency || m.freq || currentMed.frequency || '1-0-1',
-                                  no_of_days: m.no_of_days || m.days || m.noOfDays || currentMed.no_of_days || 5,
-                                  instruction: m.instruction || m.instructions || currentMed.instruction || 'After Food',
-                                  additional_comments: m.additional_comments || m.comment || m.additionalComment || currentMed.additional_comments || '',
+                                  quantity: m.quantity || m.qty || 1,
+                                  route: m.route || m.form || 'Oral',
+                                  frequency: m.frequency || m.freq || '1-0-1',
+                                  no_of_days: m.no_of_days || m.days || m.noOfDays || 5,
+                                  instruction: m.instruction || m.instructions || 'After Food',
+                                  additional_comments: m.additional_comments || m.comment || m.additionalComment || '',
                                 });
                                 setShowMedSuggestions(false);
                               }}
                             >
-                              <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                                {m.is_clinic_medicine ? (
+                                  <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>Clinic</span>
+                                ) : (
+                                  <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px', opacity: 0.75 }}>Master</span>
+                                )}
+                              </div>
                               <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
                                 {[m.route || m.form, m.frequency || m.freq, (m.no_of_days || m.days || m.noOfDays) ? `${m.no_of_days || m.days || m.noOfDays} days` : null, m.instruction || m.instructions].filter(Boolean).join(' • ') || 'Medicine'}
                               </div>
@@ -835,7 +858,7 @@ export default function Prescriptions() {
             <div className="right-drawer-panel" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
               <div className="right-drawer-header">
                 <h3 className="right-drawer-title">
-                  <Sparkles size={18} color="var(--color-primary)" /> Select {showTemplatePicker === 'medicine' ? 'Medicine' : 'Lab Test'} Template
+                  <Sparkles size={18} color="var(--color-primary)" /> Select {showTemplatePicker === 'medicine' ? 'Medicine' : showTemplatePicker === 'lab' ? 'Lab Test' : 'Treatment Plan / Advice'} Template
                 </h3>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <a
@@ -858,8 +881,15 @@ export default function Prescriptions() {
                   masterTemplates
                     .filter(t => {
                       const tType = (t.type || '').toLowerCase();
-                      if (showTemplatePicker === 'medicine') return (t.medicines && t.medicines.length > 0) || tType.includes('medicine') || tType.includes('prescription');
-                      if (showTemplatePicker === 'lab') return (t.labs && t.labs.length > 0) || tType.includes('lab');
+                      if (showTemplatePicker === 'medicine') {
+                        return (t.medicines && t.medicines.length > 0) || tType === 'medicine' || tType.includes('medicine') || tType.includes('prescription');
+                      }
+                      if (showTemplatePicker === 'lab') {
+                        return (t.labs && t.labs.length > 0) || tType === 'labtest' || tType.includes('lab');
+                      }
+                      if (showTemplatePicker === 'advice') {
+                        return (t.content && t.content.trim()) || tType === 'instruction' || tType.includes('instruction');
+                      }
                       return true;
                     })
                     .map((tpl, tIdx) => (
@@ -878,6 +908,12 @@ export default function Prescriptions() {
                         {tpl.labs && tpl.labs.length > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                             <strong>Labs ({tpl.labs.length}):</strong> {tpl.labs.join(', ')}
+                          </div>
+                        )}
+
+                        {tpl.content && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', whiteSpace: 'pre-wrap', maxHeight: '60px', overflow: 'hidden' }}>
+                            <strong>Advice:</strong> {tpl.content}
                           </div>
                         )}
 

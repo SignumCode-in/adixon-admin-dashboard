@@ -95,7 +95,7 @@ export default function PatientDetails() {
       const targetClinicId = patient?.clinic_id?._id || patient?.clinic_id || user?.clinic_id?._id || user?.clinic_id;
       const templateParams = targetClinicId ? { clinic_id: targetClinicId, limit: 100 } : { limit: 100 };
       const [medsRes, labsRes, tempsRes, optsRes] = await Promise.allSettled([
-        medicineAPI.getMedicines({ limit: 100 }),
+        medicineAPI.getMedicines({ ...templateParams, limit: 1000 }),
         labAPI.getLabs({ limit: 100 }),
         templateAPI.getTemplates(templateParams),
         medicineAPI.getMedicineOptions(),
@@ -1000,17 +1000,24 @@ export default function PatientDetails() {
                                       onClick={() => {
                                         setCurrentMed({
                                           name: m.name || m.medicine_name || '',
-                                          quantity: m.quantity || m.qty || currentMed.quantity || 1,
-                                          route: m.route || m.form || currentMed.route || 'Oral',
-                                          frequency: m.frequency || m.freq || currentMed.frequency || '1-0-1',
-                                          no_of_days: m.no_of_days || m.days || m.noOfDays || currentMed.no_of_days || 5,
-                                          instruction: m.instruction || m.instructions || currentMed.instruction || 'After Food',
-                                          additional_comments: m.additional_comments || m.comment || m.additionalComment || currentMed.additional_comments || '',
+                                          quantity: m.quantity || m.qty || 1,
+                                          route: m.route || m.form || 'Oral',
+                                          frequency: m.frequency || m.freq || '1-0-1',
+                                          no_of_days: m.no_of_days || m.days || m.noOfDays || 5,
+                                          instruction: m.instruction || m.instructions || 'After Food',
+                                          additional_comments: m.additional_comments || m.comment || m.additionalComment || '',
                                         });
                                         setShowMedSuggestions(false);
                                       }}
                                     >
-                                      <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                                        {m.is_clinic_medicine ? (
+                                          <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>Clinic</span>
+                                        ) : (
+                                          <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px', opacity: 0.75 }}>Master</span>
+                                        )}
+                                      </div>
                                       <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
                                         {[m.route || m.form, m.frequency || m.freq, (m.no_of_days || m.days || m.noOfDays) ? `${m.no_of_days || m.days || m.noOfDays} days` : null, m.instruction || m.instructions].filter(Boolean).join(' • ') || 'Medicine'}
                                       </div>

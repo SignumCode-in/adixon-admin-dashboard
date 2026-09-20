@@ -69,7 +69,7 @@ export default function Templates() {
 
   // Dynamic Medicines list for Prescription/Medicines templates
   const [medicines, setMedicines] = useState([]);
-  const [currentMed, setCurrentMed] = useState({ name: '', route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
+  const [currentMed, setCurrentMed] = useState({ name: '', quantity: 1, route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
   const [editingMedIndex, setEditingMedIndex] = useState(null);
   const [showMedSuggestions, setShowMedSuggestions] = useState(false);
 
@@ -86,7 +86,7 @@ export default function Templates() {
       const params = targetClinicId ? { clinic_id: targetClinicId } : {};
       const [tempsRes, medsRes, labsRes, optsRes] = await Promise.allSettled([
         templateAPI.getTemplates(params),
-        medicineAPI.getMedicines({ limit: 1000 }),
+        medicineAPI.getMedicines({ ...params, limit: 1000 }),
         labAPI.getLabs({ limit: 1000 }),
         medicineAPI.getMedicineOptions(),
       ]);
@@ -126,7 +126,7 @@ export default function Templates() {
     setRemarks('');
     setMedicines([]);
     setLabs([]);
-    setCurrentMed({ name: '', route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
+    setCurrentMed({ name: '', quantity: 1, route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
     setEditingMedIndex(null);
     setCurrentLabInput('');
     setError('');
@@ -137,19 +137,27 @@ export default function Templates() {
     setIsEdit(true);
     setEditId(t._id);
     setName(t.name || '');
-    const normType = t.type === 'medicine' || t.type === 'Prescription' ? 'Medicines'
-      : t.type === 'labTest' || t.type === 'Lab' ? 'Lab Tests'
-      : t.type === 'consent' ? 'Consents'
-      : t.type === 'instruction' ? 'Instructions'
-      : t.type === 'certificate' ? 'Certificates'
+    const normType = (t.type === 'medicine' || t.type === 'Medicines' || t.type === 'Prescription') ? 'Medicines'
+      : (t.type === 'labTest' || t.type === 'Lab Tests' || t.type === 'Lab' || t.type === 'labs') ? 'Lab Tests'
+      : (t.type === 'consent' || t.type === 'Consents') ? 'Consents'
+      : (t.type === 'instruction' || t.type === 'Instructions') ? 'Instructions'
+      : (t.type === 'certificate' || t.type === 'Certificates') ? 'Certificates'
       : t.type || 'Medicines';
     setType(normType);
     setContent(t.content || '');
     setDuration(t.duration || '');
     setRemarks(t.remarks || '');
-    setMedicines(t.medicines || []);
+    setMedicines((t.medicines || []).map(m => ({
+      name: m.name || '',
+      quantity: m.quantity || 1,
+      route: m.route || 'Oral',
+      frequency: m.frequency || '1-0-1',
+      no_of_days: m.no_of_days || 5,
+      instruction: m.instruction || 'After Food',
+      additional_comments: m.additional_comments || '',
+    })));
     setLabs(t.labs || []);
-    setCurrentMed({ name: '', route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
+    setCurrentMed({ name: '', quantity: 1, route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
     setEditingMedIndex(null);
     setCurrentLabInput('');
     setError('');
@@ -166,7 +174,7 @@ export default function Templates() {
     } else {
       setMedicines([...medicines.filter(m => m.name.trim() !== ''), currentMed]);
     }
-    setCurrentMed({ name: '', route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
+    setCurrentMed({ name: '', quantity: 1, route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
     setShowMedSuggestions(false);
   };
 
@@ -179,7 +187,7 @@ export default function Templates() {
     setMedicines(medicines.filter((_, i) => i !== index));
     if (editingMedIndex === index) {
       setEditingMedIndex(null);
-      setCurrentMed({ name: '', route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
+      setCurrentMed({ name: '', quantity: 1, route: 'Oral', frequency: '1-0-1', no_of_days: 5, instruction: 'After Food', additional_comments: '' });
     }
   };
 
@@ -234,16 +242,35 @@ export default function Templates() {
     }
 
     const targetClinicId = activeClinicId || user?.clinic_id?._id || user?.clinic_id;
+
+    // Map display type to standard canonical backend/app type
+    const canonicalType = type === 'Medicines' ? 'medicine'
+      : type === 'Lab Tests' ? 'labTest'
+      : type === 'Consents' ? 'consent'
+      : type === 'Instructions' ? 'instruction'
+      : type === 'Certificates' ? 'certificate'
+      : type;
+
     const payload = {
       name,
-      type,
+      type: canonicalType,
       doctor_id: user?._id,
       clinic_id: targetClinicId,
-      content: ['Consents', 'Instructions', 'Certificates'].includes(type) ? content : null,
-      duration: type === 'Certificates' ? duration : null,
-      remarks: type === 'Certificates' ? remarks : null,
-      medicines: type === 'Medicines' ? medicines.filter(m => m.name && m.name.trim() !== '') : [],
-      labs: type === 'Lab Tests' ? labs.filter(l => typeof l === 'string' && l.trim() !== '') : [],
+      content: ['Consents', 'Instructions', 'Certificates', 'consent', 'instruction', 'certificate'].includes(type) ? content : null,
+      duration: (type === 'Certificates' || type === 'certificate') ? duration : null,
+      remarks: (type === 'Certificates' || type === 'certificate') ? remarks : null,
+      medicines: (type === 'Medicines' || type === 'medicine')
+        ? medicines.filter(m => m.name && m.name.trim() !== '').map(m => ({
+            name: m.name,
+            quantity: Number(m.quantity) || 1,
+            route: m.route || 'Oral',
+            frequency: m.frequency || '1-0-1',
+            no_of_days: Number(m.no_of_days) || 5,
+            instruction: m.instruction || 'After Food',
+            additional_comments: m.additional_comments || '',
+          }))
+        : [],
+      labs: (type === 'Lab Tests' || type === 'labTest') ? labs.filter(l => typeof l === 'string' && l.trim() !== '') : [],
     };
 
     try {
@@ -270,11 +297,11 @@ export default function Templates() {
     const tType = (t.type || '').toLowerCase();
 
     if (categoryTab === 'all') return true;
-    if (categoryTab === 'medicines') return tType.includes('medicine') || tType.includes('prescription');
-    if (categoryTab === 'labs') return tType.includes('lab');
-    if (categoryTab === 'consents') return tType.includes('consent');
-    if (categoryTab === 'instructions') return tType.includes('instruction');
-    if (categoryTab === 'certificates') return tType.includes('certificate');
+    if (categoryTab === 'medicines') return tType === 'medicine' || tType.includes('medicine') || tType.includes('prescription');
+    if (categoryTab === 'labs') return tType === 'labtest' || tType.includes('lab');
+    if (categoryTab === 'consents') return tType === 'consent' || tType.includes('consent');
+    if (categoryTab === 'instructions') return tType === 'instruction' || tType.includes('instruction');
+    if (categoryTab === 'certificates') return tType === 'certificate' || tType.includes('certificate');
     return true;
   });
 
@@ -368,7 +395,7 @@ export default function Templates() {
                             {med.name} <span className="badge badge-info">{med.route || 'Oral'}</span>
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                            Frequency: <strong>{med.frequency || '1-0-1'}</strong> | Duration: <strong>{med.no_of_days} Days</strong> | Instruction: <strong>{med.instruction || 'After Food'}</strong>
+                            Qty: <strong>{med.quantity || 1} Units</strong> | Frequency: <strong>{med.frequency || '1-0-1'}</strong> | Duration: <strong>{med.no_of_days} Days</strong> | Instruction: <strong>{med.instruction || 'After Food'}</strong>
                             {med.additional_comments && ` (${med.additional_comments})`}
                           </div>
                         </div>
@@ -420,17 +447,24 @@ export default function Templates() {
                               onClick={() => {
                                 setCurrentMed({
                                   name: m.name || m.medicine_name || '',
-                                  quantity: m.quantity || m.qty || currentMed.quantity || 1,
-                                  route: m.route || m.form || currentMed.route || 'Oral',
-                                  frequency: m.frequency || m.freq || currentMed.frequency || '1-0-1',
-                                  no_of_days: m.no_of_days || m.days || m.noOfDays || currentMed.no_of_days || 5,
-                                  instruction: m.instruction || m.instructions || currentMed.instruction || 'After Food',
-                                  additional_comments: m.additional_comments || m.comment || m.additionalComment || currentMed.additional_comments || '',
+                                  quantity: m.quantity || m.qty || 1,
+                                  route: m.route || m.form || 'Oral',
+                                  frequency: m.frequency || m.freq || '1-0-1',
+                                  no_of_days: m.no_of_days || m.days || m.noOfDays || 5,
+                                  instruction: m.instruction || m.instructions || 'After Food',
+                                  additional_comments: m.additional_comments || m.comment || m.additionalComment || '',
                                 });
                                 setShowMedSuggestions(false);
                               }}
                             >
-                              <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{m.name || m.medicine_name}</div>
+                                {m.is_clinic_medicine ? (
+                                  <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 5px' }}>Clinic</span>
+                                ) : (
+                                  <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px', opacity: 0.75 }}>Master</span>
+                                )}
+                              </div>
                               <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>
                                 {[m.route || m.form, m.frequency || m.freq, (m.no_of_days || m.days || m.noOfDays) ? `${m.no_of_days || m.days || m.noOfDays} days` : null, m.instruction || m.instructions].filter(Boolean).join(' • ') || 'Medicine'}
                               </div>
@@ -441,6 +475,17 @@ export default function Templates() {
                   </div>
 
                   <div className="form-row" style={{ marginBottom: '10px' }}>
+                    <div className="form-group" style={{ width: '90px' }}>
+                      <label className="form-label" style={{ fontSize: '11px' }}>Quantity</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="input-field"
+                        placeholder="1"
+                        value={currentMed.quantity || 1}
+                        onChange={(e) => setCurrentMed({ ...currentMed, quantity: Number(e.target.value) || 1 })}
+                      />
+                    </div>
                     <div className="form-group" style={{ flex: 1 }}>
                       <label className="form-label" style={{ fontSize: '11px' }}>Route / Type</label>
                       <select className="input-field" value={currentMed.route} onChange={(e) => setCurrentMed({ ...currentMed, route: e.target.value })}>

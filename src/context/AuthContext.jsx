@@ -202,6 +202,7 @@ export const AuthProvider = ({ children }) => {
     if (!user) return false;
     if (user.role === 'admin' || user.role === 'doctor') return true;
     if (user.role === 'staff') {
+      if (perm === 'medicines') return true;
       const perms = user.permissions || [];
       return perms.includes(perm);
     }
